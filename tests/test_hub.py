@@ -48,7 +48,7 @@ reg = Registry(cfg, log)
 # --- catalogue -----------------------------------------------------------------------------------
 new, upd = reg.refresh()
 check(f"catalogue fetched: new={new} updates={upd} firmware={[f['id'] for f in reg.firmware_releases()]}",
-      new == ["nowplaying"] and upd == [] and reg.firmware_releases()[0]["patch_version"] == 15)
+      new == ["nowplaying"] and upd == [] and reg.firmware_releases()[0]["patch_version"] == 16)
 m = reg.install("nowplaying")
 check(f"installed {m['id']} {m['version']}; no longer 'new'", "nowplaying" in reg.installed and reg.new_ids() == [])
 
@@ -109,7 +109,7 @@ except ValueError as e:
 rel = reg.firmware_releases()[0]
 rel = dict(rel, base=dict(rel["base"], url=firmware.OFFICIAL_307["url"]))   # local copy instead of Hexcore
 img = firmware.build(rel, INDEX)
-check(f"v15 rebuilt from official + patch, sha {firmware.sha256(img)[:16]}", img == open(PATCHED, "rb").read())
+check(f"v16 rebuilt from official + patch, sha {firmware.sha256(img)[:16]}", img == open(PATCHED, "rb").read())
 bad = dict(rel, patch=dict(rel["patch"], sha256="00" * 32))
 try:
     firmware.build(bad, INDEX)
@@ -121,7 +121,7 @@ B = fake_hid.BOARD
 B.patch, B.state = 0, "app"            # official firmware on the keyboard
 steps = []
 flasher.flash(img, {rel["result_sha256"]}, lambda f, msg: steps.append(msg))
-check(f"flashed: {len(B.flash)} bytes match v15, back in normal mode, no pipelined packets",
+check(f"flashed: {len(B.flash)} bytes match v16, back in normal mode, no pipelined packets",
       bytes(B.flash[:len(img)]) == img and B.state == "app" and B.violations == 0)
 try:
     flasher.flash(img + b"x", {rel["result_sha256"]})
@@ -130,7 +130,7 @@ except flasher.FlashError:
     check("unknown image refused before touching the keyboard", True)
 
 # --- host: packages drawing on the keyboard -----------------------------------------------------
-B.patch, B.state, B.mode, B.cmds, B.oled_log = 15, "app", 4, [], []
+B.patch, B.state, B.mode, B.cmds, B.oled_log = 16, "app", 4, [], []
 cfg.pkg("hello")["enabled"] = True
 cfg.pkg("nowplaying")["enabled"] = True
 cfg.data["burn_in_shift"] = False
@@ -139,7 +139,7 @@ reg.install("hello")
 host = Host(cfg, reg, log)
 host._tick()
 check(f"connected: {host.fw}; running {sorted(host.running)}; problems {host.problems}",
-      str(host.fw) == "REVIVER v15" and sorted(host.running) == ["hello", "nowplaying"])
+      str(host.fw) == "REVIVER v16" and sorted(host.running) == ["hello", "nowplaying"])
 for _ in range(10):
     host._tick()
 ref = Image.new("L", (256, 32), 0)
@@ -181,7 +181,7 @@ except Exception:
 check("unplugged: host notices", host.kb is None)
 B.state = "app"
 host._tick()
-check("replugged: reconnects", host.kb is not None and str(host.fw) == "REVIVER v15")
+check("replugged: reconnects", host.kb is not None and str(host.fw) == "REVIVER v16")
 B.patch = 4
 host._disconnect("x"); host._tick()
 check(f"older patch on the keyboard: problems {host.problems}",
@@ -191,7 +191,7 @@ check(f"older patch on the keyboard: problems {host.problems}",
 import zlib
 from hub import gif
 from hub.device import Keyboard
-B.patch, B.state = 15, "app"
+B.patch, B.state = 16, "app"
 host._disconnect("x")
 src = [Image.new("RGB", (64, 16), (k * 40, k * 40, k * 40)) for k in range(6)]
 buf = io.BytesIO()

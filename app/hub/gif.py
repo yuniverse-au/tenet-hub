@@ -1,4 +1,4 @@
-"""The keyboard's GIF screen (screen 6, REVIVER v15+).
+"""The keyboard's GIF screen (screen 6, REVIVER v16+).
 
 The animation is stored on the keyboard's flash chip and the firmware plays it by itself, even
 with the PC off. This module turns any GIF into keyboard frames (with the user's adjustments) and
@@ -18,7 +18,7 @@ from .screen import to_4bpp
 W, H = 256, 32
 MAGIC = b"TGIF"
 FRAME_BYTES = 4096
-MIN_PATCH = 15         # v14 crashed when the app switched to the GIF screen
+MIN_PATCH = 16         # v14 crashed switching to the GIF screen; v15 refused uploads
 
 DEFAULTS = {
     "fps_cap": 12,          # never faster than this (lower it if playback stutters)
@@ -162,13 +162,18 @@ def _crc(kb, off, length):
 def _write(kb, off, data):
     for p in range(0, len(data), 48):
         part = data[p:p + 48]
-        if kb.cmd(0x17, _o24(off + p) + bytes([len(part)]) + part, timeout=1000) != b"\x00":
-            raise GifError("The keyboard refused a write.")
+        r = kb.cmd(0x17, _o24(off + p) + bytes([len(part)]) + part, timeout=2000)
+        if r != b"\x00":
+            raise GifError("The keyboard didn't answer a write." if r is None else
+                           f"The keyboard refused a write (reply {r.hex()}).")
 
 
 def _erase(kb, off):
-    if kb.cmd(0x16, _o24(off), timeout=3000) != b"\x00":
-        raise GifError("The keyboard refused to erase its GIF area.")
+    r = kb.cmd(0x16, _o24(off), timeout=8000)
+    if r is None:
+        raise GifError("The keyboard didn't answer the erase command (in 8 s).")
+    if r != b"\x00":
+        raise GifError(f"The keyboard refused to erase its GIF area (reply {r.hex()}).")
 
 
 def upload(kb, frames, burst, progress=lambda frac, msg: None):
