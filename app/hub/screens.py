@@ -12,15 +12,19 @@ MIN_PATCH = 21
 MAX = 24                      # entries the keyboard holds (6 built-in + up to 18 package screens)
 PKG = 0x80                    # keyboard code of package screen k = 0x80 + k
 
-STOCK = {
+STATS = 8                     # PC stats (REVIVER v24+): the stock Monitor screen, fed by TENET Hub
+STATS_PATCH = 24
+STOCK = {                     # in default order
     1: "Dashboard",
     2: "Keystrokes per minute",
     3: "Clock",
     4: "Logo (the image Hexcore Link uploaded)",
     6: "Image screen",
+    8: "PC stats (CPU / GPU / disk)",
     7: "Typing animation",
 }
-DEFAULT_ON = {1, 6, 7}        # what REVIVER v18-v20 showed
+DEFAULT_ON = {1, 6, 7, 8}
+NEEDS_HUB = {STATS}           # like package screens: only in the cycle while TENET Hub runs
 
 
 def _screen_packages(reg):
@@ -54,7 +58,11 @@ def entries(cfg, reg):
             out.insert(last + 1, {"id": f"pkg:{pid}"})
     for k in STOCK:
         if f"stock:{k}" not in seen and not any(e["id"] == f"stock:{k}" for e in out):
-            out.append({"id": f"stock:{k}", "on": False})
+            if k == STATS:                        # new in v24: after the image screen, on
+                at = next((n + 1 for n, e in enumerate(out) if e["id"] == "stock:6"), len(out))
+                out.insert(at, {"id": f"stock:{k}", "on": True})
+            else:
+                out.append({"id": f"stock:{k}", "on": False})
     for e in out:
         if e["id"].startswith("pkg:"):
             pid = e["id"][4:]
@@ -63,7 +71,7 @@ def entries(cfg, reg):
             e["kind"] = "Package"
         else:
             e["name"] = STOCK[int(e["id"][6:])]
-            e["kind"] = "Built in"
+            e["kind"] = "Built in, with Hub" if int(e["id"][6:]) in NEEDS_HUB else "Built in"
     return out
 
 
@@ -73,22 +81,25 @@ def save(cfg, items):
                         for e in items])
 
 
-def keyboard_list(items):
-    """-> (codes for 70 21, {package id: code}). Always has a built-in screen; at most MAX entries."""
+def keyboard_list(items, patch=99):
+    """-> (codes for 70 21, {package id: code}). Always has a built-in screen the keyboard can show
+    on its own; at most MAX entries. `patch`: the keyboard's REVIVER version (older ones refuse
+    codes they don't know, e.g. PC stats before v24)."""
     codes, slots, k = [], {}, 0
     for e in items:
         if not e["on"] or len(codes) >= MAX:
             continue
         if e["id"].startswith("stock:"):
-            codes.append(int(e["id"][6:]))
+            code = int(e["id"][6:])
+            if code == STATS and patch < STATS_PATCH:
+                continue
+            codes.append(code)
         elif k < MAX:
             slots[e["id"][4:]] = PKG + k
             codes.append(PKG + k)
             k += 1
-    if not any(c < PKG for c in codes):
+    if not any(c < PKG and c not in NEEDS_HUB for c in codes):
         codes = ([1] + codes)[:MAX]
-    if len(codes) == MAX and not any(c < PKG for c in codes):
-        codes[-1] = 1
     slots = {p: c for p, c in slots.items() if c in codes}
     return codes, slots
 

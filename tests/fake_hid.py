@@ -1,4 +1,4 @@
-"""A fake TENET 70 for tests: speaks the vendor protocol (REVIVER v23) and the IAP protocol.
+"""A fake TENET 70 for tests: speaks the vendor protocol (REVIVER v24) and the IAP protocol.
 Install with sys.modules['hid'] = fake_hid. Records everything and flags pipelined packets."""
 import struct, threading, time
 
@@ -6,7 +6,7 @@ VID, PID = 0x3311, 0xF005
 
 
 class Board:
-    def __init__(self, patch=23):
+    def __init__(self, patch=24):
         self.patch = patch
         self.state = "app"          # "app" | "iap" | "gone"
         self.mode = 5
@@ -24,6 +24,9 @@ class Board:
         self.slot = 0
         self.hub_alive = False
         self.list_writes = 0
+        self.stats_units = None          # v24 70 23
+        self.stats_values = None         # stock 70 09
+        self.stats_on = False            # mode 6 shows PC stats
         self.time = None                 # 70 07 args (month, day, weekday, h, m, s)
         self.clock_12h = None
         self.settings_writes = 0
@@ -61,7 +64,7 @@ class Board:
 
     def _screens(self, sub, a):
         ok = True
-        valid = lambda e: (1 <= e <= 7 and e != 5) or 0x80 <= e < 0x98
+        valid = lambda e: (1 <= e <= (8 if self.patch >= 24 else 7) and e != 5) or 0x80 <= e < 0x98
         if sub == 0x20:
             self.hub_alive = True
         elif sub == 0x21:
@@ -74,26 +77,32 @@ class Board:
             if ok:
                 if a[0] >= 0x80:
                     self.mode, self.slot = 5, a[0] - 0x80
+                elif a[0] == 8:
+                    self.mode, self.stats_on = 6, True
                 else:
-                    self.mode = a[0]
+                    self.mode, self.stats_on = a[0], False if a[0] == 6 else self.stats_on
         if not ok:
             return b"\x01"
-        cur = 0x80 + self.slot if self.mode == 5 else self.mode
+        cur = 0x80 + self.slot if self.mode == 5 else 8 if (self.mode == 6 and self.stats_on) else self.mode
         return bytes([0, self.mode, cur, self.hub_alive, len(self.scr)] + self.scr)
 
     def press(self, forward=True):
-        """The screen button, as the v21 firmware does it."""
+        """The screen button, as the v21+ firmware does it."""
         l = self.scr
-        cur = 0x80 + self.slot if self.mode == 5 else self.mode
+        cur = 0x80 + self.slot if self.mode == 5 else 8 if (self.mode == 6 and self.stats_on) else self.mode
         at = l.index(cur) if cur in l else (len(l) - 1 if forward else 0)
         for k in range(1, len(l) + 1):
             e = l[(at + (k if forward else -k)) % len(l)]
-            if e >= 0x80 and not self.hub_alive:
+            if (e >= 0x80 or e == 8) and not self.hub_alive:
                 continue
             if e >= 0x80:
                 self.mode, self.slot = 5, e - 0x80
+            elif e == 8:
+                self.mode, self.stats_on = 6, True
             else:
                 self.mode = e
+                if e == 6:
+                    self.stats_on = False
             return
 
     def reply(self, hdr, cmd, payload=b""):
@@ -115,6 +124,12 @@ class Board:
             if cmd == b"\x02\x01" and args[:1] == b"\x01":
                 self.state = "iap"
                 return None
+            if cmd == b"\x70\x09" and len(args) == 3:          # stock: PC stats values
+                self.stats_values = tuple(args)
+                return R(cmd, b"\x00")
+            if cmd == b"\x70\x23" and self.patch >= 24:
+                self.stats_units = args[0]
+                return R(cmd, b"\x00")
             if cmd == b"\x70\x07" and len(args) == 6:          # stock: set the clock (any firmware)
                 self.time = tuple(args)
                 return R(cmd, b"\x00")

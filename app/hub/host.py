@@ -9,7 +9,7 @@ import ctypes, datetime, os, sys, threading, time, traceback
 
 from PIL import Image
 
-from . import screens as screenlist, api, power
+from . import screens as screenlist, api, power, stats as pcstats
 from .config import data_dir, windows_uses_12h
 from .device import Keyboard, enumerate_keyboards
 from .screen import Screen
@@ -49,6 +49,8 @@ class Host:
         self.slots, self.want = {}, None             # v21: package id -> screen code; list to keep
         self._sent_list, self._sent_at = None, 0.0
         self._clock_at, self._clock_fmt = 0.0, None   # last clock sync; 12h flag sent this connection
+        self.stats = pcstats.Sampler(cfg, log)           # PC stats screen (v24)
+        self._units_sent, self._stats_at = None, 0.0
         self.running = {}                 # id -> Running
         self.problems = {}                # id -> why it isn't running
         self.paused = threading.Event()   # set while flashing: the host lets go of the keyboard
@@ -68,6 +70,7 @@ class Host:
 
     def stop(self):
         self.stopped.set()
+        self.stats.stop()
         with self.lock:
             for pid in list(self.running):
                 self._stop_pkg(pid)
@@ -178,7 +181,12 @@ class Host:
         for pid in list(self.problems):
             if pid not in wanted:
                 self.problems.pop(pid)
-        self.want, self.slots = screenlist.keyboard_list(screenlist.entries(self.cfg, self.reg))
+        patch = self.fw.patch if self.fw is not None and self.fw.kind == "patch" else 99
+        self.want, self.slots = screenlist.keyboard_list(screenlist.entries(self.cfg, self.reg), patch)
+        if self.want and screenlist.STATS in self.want:
+            self.stats.start()
+        else:
+            self.stats.stop()
 
     def _fail(self, r, e):
         r.errors += 1
@@ -218,6 +226,7 @@ class Host:
         self.kb, self.fw = kb, fw
         self._sent_list, self._sent_at = None, 0.0
         self._clock_at, self._clock_fmt = 0.0, None   # last clock sync; 12h flag sent this connection
+        self._units_sent, self._stats_at = None, 0.0
         self.screen = Screen(kb, fw, self.cfg["contrast"]) if fw.at_least(1) else None
         if self.screen:
             self.screen.hold_off = self.asleep
@@ -234,6 +243,17 @@ class Host:
         self.problems.clear()                      # firmware may have changed: re-check
         self._event("connected", fw)
         return True
+
+    # --- PC stats screen (v24) -----------------------------------------------------------
+    def _feed_stats(self, current):
+        units = pcstats.units_bits(pcstats.kinds(self.cfg))
+        if units != self._units_sent:                     # °C or % per slot (RAM only: resend per connection)
+            r = self.kb.cmd(0x23, bytes([units]))
+            if r is not None and r[:1] == b"\x00":
+                self._units_sent = units
+        if current == screenlist.STATS and time.time() - self._stats_at >= 1.0:
+            self._stats_at = time.time()
+            self.kb.cmd(0x09, self.stats.values())       # stock 70 09: CPU, GPU, DISK (0-99)
 
     # --- the keyboard's clock (Dashboard / Clock screens) -------------------------------
     CLOCK_EVERY = 60
@@ -310,6 +330,8 @@ class Host:
                         self.log("screen list sent:", [hex(x) for x in self.want])
                     else:
                         self.log("the keyboard refused the screen list:", [hex(x) for x in self.want])
+                if self.fw.at_least(screenlist.STATS_PATCH):
+                    self._feed_stats(mode)
             if self.asleep or self.screen is None:
                 return 0.5
             if not v21:

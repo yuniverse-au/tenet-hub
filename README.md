@@ -19,6 +19,9 @@ Firmware updates and screen packages for the **Metakey TENET 70** keyboard (Hexc
 ### Screens
 The **Screens** tab sets which screens the keyboard's screen button goes through, and in what order. Built-in screens (Dashboard, KPM, clock, the Hexcore Link logo, image screen, typing animation) can be turned on or off and moved; every screen package gets a screen of its own in the same list, up to 24 screens in all. The list is stored on the keyboard, so the button works the same with the PC off. Package screens only come up while TENET Hub is running, so the keyboard never stops on a blank screen. Needs REVIVER v21 or newer.
 
+### PC stats
+The **PC stats** screen (built in, REVIVER v24+) shows CPU, GPU and disk plus the date and day. In the Screens tab, pick for each one whether it shows a temperature (°C) or a usage (%). Usage comes from Windows. Temperatures come from [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) if it's running (as administrator, with *Options > Remote Web Server* on), and the GPU temperature of NVIDIA cards also works without it. TENET Hub feeds the screen, so it's only in the button cycle while TENET Hub runs.
+
 ### Clock and Dashboard
 TENET Hub sets the keyboard's clock from your PC (the same thing Hexcore Link does), so the **Dashboard** shows the time, date and day and the **Clock** screen shows the right time. It syncs when the keyboard connects, after the PC wakes and once a minute. Choose 12- or 24-hour (or *Same as Windows*) in Settings. This works on the official firmware too.
 

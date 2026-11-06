@@ -55,7 +55,15 @@ def selftest():
         if m["type"] != "animation":
             cls = reg.load_class(m)
             assert issubclass(cls, (api.ScreenPackage, api.BackgroundPackage)), m["id"]
-    open(os.path.join(os.getcwd(), "selftest.ok"), "w").write(", ".join(sorted(reg.installed)))
+    extra = ""
+    if sys.platform == "win32":                       # PC stats: Windows performance counters work
+        from hub import stats
+        pdh = stats._Pdh()
+        time.sleep(1.1)
+        s = pdh.sample()
+        assert s.get("cpu") is not None and s.get("disk") is not None, s
+        extra = f" | stats {s}"
+    open(os.path.join(os.getcwd(), "selftest.ok"), "w").write(", ".join(sorted(reg.installed)) + extra)
 
 
 def main():

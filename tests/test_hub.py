@@ -48,7 +48,7 @@ reg = Registry(cfg, log)
 # --- catalogue -----------------------------------------------------------------------------------
 new, upd = reg.refresh()
 check(f"catalogue fetched: new={new} updates={upd} firmware={[f['id'] for f in reg.firmware_releases()]}",
-      new == ["nowplaying"] and upd == [] and reg.firmware_releases()[0]["patch_version"] == 23)
+      new == ["nowplaying"] and upd == [] and reg.firmware_releases()[0]["patch_version"] == 24)
 m = reg.install("nowplaying")
 check(f"installed {m['id']} {m['version']}; no longer 'new'", "nowplaying" in reg.installed and reg.new_ids() == [])
 
@@ -109,7 +109,7 @@ except ValueError as e:
 rel = reg.firmware_releases()[0]
 rel = dict(rel, base=dict(rel["base"], url=firmware.OFFICIAL_307["url"]))   # local copy instead of Hexcore
 img = firmware.build(rel, INDEX)
-check(f"v23 rebuilt from official + patch, sha {firmware.sha256(img)[:16]}", img == open(PATCHED, "rb").read())
+check(f"v24 rebuilt from official + patch, sha {firmware.sha256(img)[:16]}", img == open(PATCHED, "rb").read())
 bad = dict(rel, patch=dict(rel["patch"], sha256="00" * 32))
 try:
     firmware.build(bad, INDEX)
@@ -121,7 +121,7 @@ B = fake_hid.BOARD
 B.patch, B.state = 0, "app"            # official firmware on the keyboard
 steps = []
 flasher.flash(img, {rel["result_sha256"]}, lambda f, msg: steps.append(msg))
-check(f"flashed: {len(B.flash)} bytes match v23, back in normal mode, no pipelined packets",
+check(f"flashed: {len(B.flash)} bytes match v24, back in normal mode, no pipelined packets",
       bytes(B.flash[:len(img)]) == img and B.state == "app" and B.violations == 0)
 try:
     flasher.flash(img + b"x", {rel["result_sha256"]})
@@ -193,6 +193,25 @@ host._disconnect("x"); host._tick()
 check(f"older patch on the keyboard: problems {host.problems}",
       "Needs REVIVER v6" in host.problems.get("nowplaying", "") and "hello" not in host.problems)
 
+# --- PC stats sources (pure parts; the Windows counters run in the .exe self-test on CI) ------------
+from hub import stats as pcstats
+lhm = {"Text": "Sensor", "Children": [{"Text": "DESKTOP", "Children": [
+    {"Text": "AMD Ryzen 7 5800X", "Children": [{"Text": "Temperatures", "Children": [
+        {"Text": "Core (Tctl/Tdie)", "Value": "61.3 °C", "Type": "Temperature", "SensorId": "/amdcpu/0/temperature/2", "Children": []},
+        {"Text": "CCD1 (Tdie)", "Value": "70.0 °C", "Type": "Temperature", "SensorId": "/amdcpu/0/temperature/3", "Children": []}]}]},
+    {"Text": "NVIDIA GeForce RTX 3080", "Children": [{"Text": "Temperatures", "Children": [
+        {"Text": "GPU Core", "Value": "54,0 °C", "Type": "Temperature", "SensorId": "/gpu-nvidia/0/temperature/0", "Children": []},
+        {"Text": "GPU Hot Spot", "Value": "66.0 °C", "Type": "Temperature", "SensorId": "/gpu-nvidia/0/temperature/2", "Children": []}]}]},
+    {"Text": "Samsung SSD 980 PRO 1TB", "Children": [{"Text": "Temperatures", "Children": [
+        {"Text": "Temperature", "Value": "38.0 °C", "Type": "Temperature", "SensorId": "/nvme/0/temperature/0", "Children": []},
+        {"Text": "Warning Temperature", "Value": "82.0 °C", "Type": "Temperature", "SensorId": "/nvme/0/temperature/5", "Children": []}]}]}]}]}
+t = pcstats.lhm_temps(lhm)
+check(f"LibreHardwareMonitor temps: {t}", t == {"cpu": 61.3, "gpu": 54.0, "disk": 38.0})
+check("units bits: CPU and disk usage -> 0b101", pcstats.units_bits({"cpu": "usage", "gpu": "temp", "disk": "usage"}) == 0b101)
+check("values clamp to 0-99", [pcstats.to_byte(v) for v in (None, -3, 42.6, 100, 250)] == [0, 0, 43, 99, 99])
+smp = pcstats.Sampler(cfg, log)
+check(f"sampler without sources (Linux): {smp.sample()}", all(v[0] is None for v in smp.sample().values()))
+
 # --- keyboard clock (stock 70 07 / 70 0A, what Hexcore Link sends) ------------------------------
 import datetime
 B.patch, B.state = 0, "app"                       # works on the official firmware too
@@ -216,7 +235,7 @@ cfg.data["sync_clock"] = True; cfg.data["clock_format"] = "auto"
 
 # --- v21: screen list, every screen package on a screen of its own ----------------------------
 from hub import screens as screenlist
-B.patch, B.mode, B.scr, B.hub_alive, B.list_writes = 23, 1, [1, 0x80, 6, 7], False, 0
+B.patch, B.mode, B.scr, B.hub_alive, B.list_writes = 24, 1, [1, 0x80, 6, 7], False, 0
 cfg.pkg("hello")["enabled"] = True
 cfg.pkg("nowplaying")["enabled"] = True
 cfg.set("screens", [])
@@ -226,12 +245,12 @@ for _ in range(3):
     host._tick()
 items = screenlist.entries(cfg, reg)
 check(f"default order: {[e['id'] for e in items]}",
-      [e["id"] for e in items] == ["stock:1", "pkg:hello", "pkg:nowplaying", "stock:2", "stock:3", "stock:4", "stock:6", "stock:7"]
-      and [e["on"] for e in items] == [True, True, True, False, False, False, True, True])
+      [e["id"] for e in items] == ["stock:1", "pkg:hello", "pkg:nowplaying", "stock:2", "stock:3", "stock:4", "stock:6", "stock:8", "stock:7"]
+      and [e["on"] for e in items] == [True, True, True, False, False, False, True, True, True])
 check(f"both screen packages run, no conflicts ({sorted(host.running)}, {host.problems})",
       sorted(host.running) == ["hello", "nowplaying"] and not host.problems)
 check(f"list sent to the keyboard once: {[hex(x) for x in B.scr]} ({B.list_writes} write)",
-      B.scr == [1, 0x80, 0x81, 6, 7] and B.list_writes == 1 and B.hub_alive)
+      B.scr == [1, 0x80, 0x81, 6, 8, 7] and B.list_writes == 1 and B.hub_alive)
 for _ in range(3):
     host._tick()
 check("not rewritten while it matches", B.list_writes == 1)
@@ -246,7 +265,20 @@ for _ in range(15):
 np_img = host.running["nowplaying"].obj.frame(time.time())
 check("button -> Now Playing's own screen, drawn", B.slot == 1 and host.running["nowplaying"].shown
       and not host.running["hello"].shown and bytes(B.screen)[:16 * 128] == screen.to_4bpp(np_img)[:16 * 128])
-B.press(); check("button -> image screen", B.mode == 6)
+B.press(); check("button -> image screen", B.mode == 6 and not B.stats_on)
+# --- v24 PC stats screen ---
+check("PC stats sampler running (the screen is in the list)", host.stats.running())
+host.stats.values = lambda: bytes([12, 61, 4])
+cfg.set("stats_kinds", {"cpu": "usage", "gpu": "temp", "disk": "usage"})
+B.press(); host._stats_at = 0
+for _ in range(2):
+    host._tick()
+check(f"button -> PC stats; values sent {B.stats_values}, units {B.stats_units:#05b}",
+      B.mode == 6 and B.stats_on and B.stats_values == (12, 61, 4) and B.stats_units == 0b101)
+cfg.set("stats_kinds", {"cpu": "temp", "gpu": "temp", "disk": "temp"}); host._tick()
+check("changing a slot to temperature updates the units", B.stats_units == 0)
+B.press(); B.stats_values = None; host._stats_at = 0; host._tick()
+check("off the PC stats screen: no values sent", B.mode == 7 and B.stats_values is None)
 host.running["hello"].ctx.request_mode(5); host._tick()
 check(f"a package asking for its screen gets its own one ({B.mode}, slot {B.slot})", B.mode == 5 and B.slot == 0)
 host._request("show", 3); host._tick()
@@ -258,11 +290,11 @@ next(e for e in items if e["id"] == "stock:3")["on"] = True
 next(e for e in items if e["id"] == "stock:7")["on"] = False
 screenlist.save(cfg, items)
 host._tick()
-check(f"reordered + clock on + typing off: {[hex(x) for x in B.scr]}", B.scr == [0x80, 1, 0x81, 3, 6])
+check(f"reordered + clock on + typing off: {[hex(x) for x in B.scr]}", B.scr == [0x80, 1, 0x81, 3, 6, 8])
 host._tick(); host._tick()
 check("package slots follow the order (Now Playing is 0x80 now)", host.slots == {"nowplaying": 0x80, "hello": 0x81})
 cfg.pkg("hello")["enabled"] = False; cfg.save(); host._tick()
-check(f"package turned off -> its screen leaves the list: {[hex(x) for x in B.scr]}", B.scr == [0x80, 1, 3, 6])
+check(f"package turned off -> its screen leaves the list: {[hex(x) for x in B.scr]}", B.scr == [0x80, 1, 3, 6, 8])
 B.hub_alive = False; B.mode = 1; B.press()
 check("Hub not running: the button skips package screens", B.mode == 3)
 only_pkgs = [{"id": "pkg:nowplaying", "on": True, "name": "", "kind": ""}, {"id": "stock:1", "on": False}]
@@ -271,7 +303,7 @@ B.scr = [1, 0x80, 6, 7]                  # the keyboard lost the list (v21 witho
 host._tick()
 check("the keyboard lost the list: not resent within 3 s", B.scr == [1, 0x80, 6, 7])
 host._sent_at -= 4; host._tick()
-check(f"... resent after 3 s: {[hex(x) for x in B.scr]}", B.scr == [0x80, 1, 3, 6])
+check(f"... resent after 3 s: {[hex(x) for x in B.scr]}", B.scr == [0x80, 1, 3, 6, 8])
 cfg.set("screens", []); cfg.pkg("hello")["enabled"] = True; cfg.save()
 check(f"never pipelined ({B.violations})", B.violations == 0)
 

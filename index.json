@@ -21,22 +21,22 @@
   ],
   "firmware": [
     {
-      "name": "REVIVER v23",
-      "patch_version": 23,
-      "notes": "Fixes the screen button going through screens in a jumbled order (and Back bouncing between two screens) after Now Playing or another package had been drawing: the drawing overwrote the keyboard's copy of your screen list. Everything from v22: your own screen list (Screens tab), a screen for every screen package, changeable boot logo, the image screen, live drawing, tear-free scrolling, screen-off support.",
+      "name": "REVIVER v24",
+      "patch_version": 24,
+      "notes": "PC stats is back as a built-in screen: CPU, GPU and disk, each as a temperature or a usage (pick in the Screens tab), plus the date and day. TENET Hub feeds it, so it only comes up while TENET Hub is running. Everything from v23: your own screen list, a screen for every screen package, changeable boot logo, the image screen, live drawing, tear-free scrolling, screen-off support.",
       "base": {
         "version": "3.0.7",
         "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
         "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
         "size": 86620
       },
-      "id": "v23",
+      "id": "v24",
       "patch": {
-        "url": "firmware/v23/patch.json",
-        "sha256": "F60DD3A5C17F30919E9F51D85EB34DD9835BF2A6FDE159EC95B33B0C08A29B19"
+        "url": "firmware/v24/patch.json",
+        "sha256": "5C136B544CCFA344C45DFDF62A13B5C49BB483A05460B7EA70511CF121ECD4D3"
       },
-      "result_sha256": "D0F72C78E51FF981E8EC6B784CA6C3A4F094D3E401A19691681F594562310A5C",
-      "result_size": 92448,
+      "result_sha256": "68DD94544ED6D626068351FBE63478D4F1F5DDD714482F8AB9F7814054BB712F",
+      "result_size": 92823,
       "base_sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56"
     }
   ]

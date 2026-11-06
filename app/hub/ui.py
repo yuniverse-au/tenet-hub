@@ -6,7 +6,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageDraw
 
-from . import APP_NAME, VERSION, api, bootlogo, firmware, flasher, gif, screens
+from . import APP_NAME, VERSION, api, bootlogo, firmware, flasher, gif, screens, stats as pcstats
 from .device import Keyboard, enumerate_keyboards
 from .config import data_dir, set_start_at_login
 
@@ -80,6 +80,9 @@ class App:
                 pass
         if not self.busy:
             self.fw_status.set(self._fw_text())
+        if now - getattr(self, "_stats_ui_at", 0) >= 1:
+            self._stats_ui_at = now
+            self._stats_live()
         self.root.after(500, self._pump)
 
     def show(self):
@@ -351,7 +354,45 @@ class App:
         ttk.Button(side, text="Reset to default", command=self.scr_reset).pack(fill="x", pady=(4, 0))
         self.scr_msg = tk.StringVar()
         ttk.Label(f, textvariable=self.scr_msg, foreground="#555", wraplength=820, justify="left").pack(anchor="w")
+        box = ttk.LabelFrame(f, text="PC stats screen", padding=8)
+        box.pack(fill="x", pady=(8, 0))
+        k = pcstats.kinds(self.cfg)
+        self.stat_vars, self.stat_now = {}, {}
+        for i, s in enumerate(pcstats.SLOTS):
+            ttk.Label(box, text=pcstats.NAMES[s]).grid(row=i, column=0, sticky="w", padx=(0, 8))
+            v = tk.StringVar(value=pcstats.KINDS[k[s]])
+            cb = ttk.Combobox(box, textvariable=v, values=list(pcstats.KINDS.values()), state="readonly", width=18)
+            cb.grid(row=i, column=1, sticky="w", pady=1)
+            cb.bind("<<ComboboxSelected>>", lambda e: self._stats_kinds_changed())
+            now = tk.StringVar(value="")
+            ttk.Label(box, textvariable=now, foreground="#555").grid(row=i, column=2, sticky="w", padx=10)
+            self.stat_vars[s], self.stat_now[s] = v, now
+        ttk.Label(box, text="Temperatures come from LibreHardwareMonitor (run it as administrator and turn on "
+                            "Options > Remote Web Server) or, for NVIDIA graphics cards, the NVIDIA driver. "
+                            "Usage comes from Windows. The keyboard shows 0-99.",
+                  foreground="#555", wraplength=800, justify="left").grid(row=3, column=0, columnspan=3, sticky="w", pady=(6, 0))
         self.refresh_screens()
+
+    def _stats_kinds_changed(self):
+        rev = {v: k for k, v in pcstats.KINDS.items()}
+        self.cfg.set("stats_kinds", {s: rev[v.get()] for s, v in self.stat_vars.items()})
+        for s in pcstats.SLOTS:
+            self.stat_now[s].set("")
+
+    def _stats_live(self):
+        if not hasattr(self, "stat_now"):
+            return
+        if not self.host.stats.running():
+            for s in pcstats.SLOTS:
+                self.stat_now[s].set("(turn the PC stats screen on to see live values)" if s == "cpu" else "")
+            return
+        for s in pcstats.SLOTS:
+            v, unit, src = self.host.stats.latest.get(s) or (None, "", None)
+            if v is None:
+                self.stat_now[s].set("not available" + (" - is LibreHardwareMonitor running with its web server on?"
+                                                        if unit == "°C" else ""))
+            else:
+                self.stat_now[s].set(f"now {pcstats.to_byte(v)}{unit}  ({src})")
 
     def refresh_screens(self):
         tv = self.scr_tv
@@ -364,9 +405,11 @@ class App:
         tv.tag_configure("off", foreground="#888")
         if sel and tv.exists(sel[0]):
             tv.selection_set(sel[0])
-        codes, _ = screens.keyboard_list(self.scr_items)
         fw = self.host.fw
+        codes, _ = screens.keyboard_list(self.scr_items, fw.patch if fw is not None and fw.kind == "patch" else 99)
         msg = f"{len(codes)} screens in the cycle (the keyboard holds up to {screens.MAX})."
+        if fw is not None and fw.at_least(screens.MIN_PATCH) and not fw.at_least(screens.STATS_PATCH):
+            msg += f" PC stats needs REVIVER v{screens.STATS_PATCH} (Firmware tab)."
         if fw is not None and not fw.at_least(screens.MIN_PATCH):
             msg = (f"Changing the screens needs REVIVER v{screens.MIN_PATCH} or newer (Firmware tab). "
                    "Your choices here are kept and sent to the keyboard once it has it.")
