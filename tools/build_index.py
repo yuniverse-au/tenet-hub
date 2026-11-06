@@ -30,6 +30,7 @@ def zip_package(folder, out_path):
                 p = os.path.join(base, f)
                 info = zipfile.ZipInfo(os.path.relpath(p, folder).replace(os.sep, "/"), (2026, 1, 1, 0, 0, 0))
                 info.compress_type = zipfile.ZIP_STORED
+                info.create_system, info.external_attr = 3, 0o644 << 16   # same metadata on every OS
                 z.writestr(info, open(p, "rb").read())      # fixed timestamps: same zip each build
 
 
