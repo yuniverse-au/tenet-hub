@@ -70,7 +70,7 @@ def main():
 
     index = {"format": 1, "hub": {"version": VERSION, "url": HUB_RELEASES},
              "packages": packages, "firmware": releases}
-    with open(os.path.join(ROOT, "index.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(ROOT, "index.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(index, f, indent=2, ensure_ascii=False)
         f.write("\n")
     print("wrote index.json")

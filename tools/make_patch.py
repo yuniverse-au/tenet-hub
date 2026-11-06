@@ -29,9 +29,9 @@ def main():
     assert firmware.apply_patch(base, patch) == result
     out = os.path.join(ROOT, "firmware", a.id)
     os.makedirs(out, exist_ok=True)
-    json.dump(patch, open(os.path.join(out, "patch.json"), "w"), indent=1)
+    json.dump(patch, open(os.path.join(out, "patch.json"), "w", newline="\n"), indent=1)
     json.dump({"name": a.name, "patch_version": a.patch_version, "notes": a.notes,
-               "base": firmware.OFFICIAL_307}, open(os.path.join(out, "release.json"), "w"), indent=2)
+               "base": firmware.OFFICIAL_307}, open(os.path.join(out, "release.json"), "w", newline="\n"), indent=2)
     print(f"{a.id}: {len(patch['segments'])} segments, result {patch['result_sha256'][:16]}...")
 
 
