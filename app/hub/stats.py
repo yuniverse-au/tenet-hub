@@ -234,7 +234,8 @@ class Sampler:
         self._thread = None
         self._pdh = self._nvml = None
         self._pdh_tried = self._nvml_tried = False
-        self._lhm_fail_until = 0.0
+        self._fail_until = {}                   # source -> time to try again
+        self.temp_sources = {}                  # source -> last time it answered (for the UI)
 
     def running(self):
         return self._thread is not None and self._thread.is_alive()
@@ -269,14 +270,20 @@ class Sampler:
     def _temps(self):
         out, src = {}, {}
         now = time.time()
-        if now >= self._lhm_fail_until:
+        from . import sensors
+        for name, url in (("TENET Hub sensors", sensors.URL),          # our helper (hub/sensors.py)
+                          ("LibreHardwareMonitor", self.cfg.get("lhm_url") or LHM_URL)):
+            if now < self._fail_until.get(name, 0):
+                continue
             try:
-                url = self.cfg.get("lhm_url") or LHM_URL
                 with urllib.request.urlopen(url, timeout=0.4) as r:
-                    for k, v in lhm_temps(json.load(r)).items():
-                        out[k], src[k] = v, "LibreHardwareMonitor"
+                    found = lhm_temps(json.load(r))
+                self.temp_sources[name] = now
+                for k, v in found.items():
+                    if k not in out:
+                        out[k], src[k] = v, name
             except Exception:
-                self._lhm_fail_until = now + 15          # not running: try again in a bit
+                self._fail_until[name] = now + 15         # not running: try again in a bit
         if "gpu" not in out:
             if not self._nvml_tried:
                 self._nvml_tried = True

@@ -221,6 +221,26 @@ check("disk in a 3-character box is DSK", pcstats.labels(cfg) == {"cpu": "DSK", 
 check("70 24 payload", pcstats.label_payload("disk", "RAM") == bytes([2]) + b"RAM\0")
 cfg.data.pop("stats_sources"); cfg.data.pop("stats_kinds")
 check("values clamp to 0-99", [pcstats.to_byte(v) for v in (None, -3, 42.6, 100, 250)] == [0, 0, 43, 99, 99])
+# the built-in sensor helper (hub/sensors.py) serves LibreHardwareMonitor's format; it comes first
+from hub import sensors
+helper = http.server.ThreadingHTTPServer(("127.0.0.1", 0), type("H", (http.server.BaseHTTPRequestHandler,), {
+    "do_GET": lambda self: (self.send_response(200), self.end_headers(), self.wfile.write(json.dumps(lhm).encode())),
+    "log_message": lambda *a: None}))
+threading.Thread(target=helper.serve_forever, daemon=True).start()
+real_url, sensors.URL = sensors.URL, f"http://127.0.0.1:{helper.server_port}/data.json"
+cfg.data["lhm_url"] = "http://127.0.0.1:9/data.json"                 # nothing there
+cfg.data["stats_sources"] = {"cpu": "cpu_temp", "gpu": "gpu_temp", "disk": "disk_temp"}
+got = pcstats.Sampler(cfg, log).sample()
+check(f"temperatures from the sensor helper: {got}",
+      got == {"cpu": (61.3, "°C", "TENET Hub sensors"), "gpu": (54.0, "°C", "TENET Hub sensors"),
+              "disk": (38.0, "°C", "TENET Hub sensors")})
+helper.shutdown(); sensors.URL = real_url
+cfg.data.pop("stats_sources"); cfg.data.pop("lhm_url")
+x = sensors.task_xml("PC\\dylan")
+check("sensor task: logon trigger for the user, highest rights, no time limit, runs --sensors",
+      "<UserId>PC\\dylan</UserId>" in x and "<RunLevel>HighestAvailable</RunLevel>" in x
+      and "<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>" in x and "--sensors</Arguments>" in x
+      and "<DisallowStartIfOnBatteries>false" in x)
 smp = pcstats.Sampler(cfg, log)
 check(f"sampler without sources (Linux): {smp.sample()}", all(v[0] is None for v in smp.sample().values()))
 

@@ -5,7 +5,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageDraw
 
-from . import APP_NAME, VERSION, api, bootlogo, firmware, flasher, gif, screens, stats as pcstats
+from . import APP_NAME, VERSION, api, bootlogo, firmware, flasher, gif, screens, sensors, stats as pcstats
 from .device import Keyboard, enumerate_keyboards
 from .config import data_dir, set_start_at_login
 
@@ -388,6 +388,87 @@ class App:
                             f"number follows what it measures on REVIVER v{pcstats.LABELS_PATCH} or newer "
                             "(older firmware always shows CPU / GPU / DISK).",
                   foreground="#555", wraplength=800, justify="left").grid(row=3, column=0, columnspan=4, sticky="w", pady=(6, 0))
+        self._build_sensors(f)
+
+    # temperature sensors (hub/sensors.py): one admin prompt sets up a helper that starts at login
+    def _build_sensors(self, f):
+        box = ttk.LabelFrame(f, text="Temperature sensors", padding=8)
+        box.pack(fill="x", pady=(8, 0))
+        self.sens_msg = tk.StringVar()
+        ttk.Label(box, textvariable=self.sens_msg, wraplength=640, justify="left").pack(side="left", fill="x", expand=True)
+        self.b_sens = ttk.Button(box, text="Set up", command=self.sensors_toggle)
+        self.b_sens.pack(side="right")
+        self._sens_alive, self._sens_checked, self._sens_busy = None, 0.0, False
+        self._sensors_status()
+
+    def _sensors_status(self):
+        if not sensors.available():
+            self.sens_msg.set("CPU and disk temperatures need LibreHardwareMonitor running as administrator with "
+                              "its web server on (this copy of TENET Hub doesn't include the built-in sensors).")
+            self.b_sens.pack_forget()
+            return
+        if self._sens_busy:
+            return
+        alive, set_up = self._sens_alive, self.cfg.get("sensors_helper")
+        if alive:
+            self.sens_msg.set("Built-in temperature sensors are running (they start with Windows).")
+            self.b_sens.configure(text="Remove")
+        elif set_up:
+            self.sens_msg.set("Built-in temperature sensors are set up but not running. If you moved "
+                              "TenetHub.exe, set them up again.")
+            self.b_sens.configure(text="Set up again")
+        else:
+            self.sens_msg.set("CPU and disk temperatures need TENET Hub's built-in sensors. Setting them up "
+                              "asks Windows for administrator permission once; after that they start with "
+                              "Windows by themselves. (GPU temperature on NVIDIA cards works without them.)")
+            self.b_sens.configure(text="Set up")
+
+    def _sensors_poll(self):
+        """Every few seconds, off the UI thread: is the helper answering?"""
+        if not sensors.available() or self._sens_busy or time.time() - self._sens_checked < 3:
+            return
+        self._sens_checked = time.time()
+
+        def done(alive, err):
+            self._sens_alive = bool(alive)
+            self._sensors_status()
+        self._thread(sensors.alive, done)
+
+    def sensors_toggle(self):
+        if self._sens_busy:
+            return
+        removing = bool(self._sens_alive) and self.cfg.get("sensors_helper")
+        if removing and not messagebox.askyesno(APP_NAME, "Remove the built-in temperature sensors?\n\n"
+                                                          "CPU and disk temperatures will stop working "
+                                                          "unless LibreHardwareMonitor runs instead."):
+            return
+        self._sens_busy = True
+        self.b_sens.configure(state="disabled")
+        self.sens_msg.set("Waiting for Windows... (approve the administrator prompt)")
+
+        def work():
+            if removing:
+                return sensors.run_as_admin("--sensors-remove")
+            return sensors.run_as_admin("--sensors-setup", f'"{sensors.current_user()}"')
+
+        def done(code, err):
+            self._sens_busy = False
+            self.b_sens.configure(state="normal")
+            if err or code is None:
+                messagebox.showinfo(APP_NAME, "Nothing was changed." if code is None and not err else
+                                    f"That didn't work: {err}")
+            elif code != 0:
+                why = {3: "the PawnIO driver didn't install", 4: "Windows didn't accept the scheduled task",
+                       5: "it didn't get administrator rights"}.get(code, f"error {code}")
+                messagebox.showerror(APP_NAME, f"The temperature sensors weren't set up: {why}.\n\n"
+                                               f"Details are in sensors.log in {data_dir()}.")
+            else:
+                self.cfg.set("sensors_helper", not removing)
+                self.host.stats._fail_until.clear()       # look for the helper straight away
+            self._sens_checked = 0.0
+            self._sensors_status()
+            self._sensors_poll()
+        self._thread(work, done)
 
     def _stats_sources_changed(self):
         rev = {v[0]: k for k, v in pcstats.SOURCES.items()}
@@ -400,6 +481,7 @@ class App:
     def _stats_live(self):
         if not hasattr(self, "stat_now"):
             return
+        self._sensors_poll()
         if not self.host.stats.running():
             for s in pcstats.SLOTS:
                 self.stat_now[s].set("(turn the PC stats screen on to see live values)" if s == "cpu" else "")
@@ -407,8 +489,12 @@ class App:
         for s in pcstats.SLOTS:
             v, unit, src = self.host.stats.latest.get(s) or (None, "", None)
             if v is None:
-                self.stat_now[s].set("not available" + (" - is LibreHardwareMonitor running with its web server on?"
-                                                        if unit == "°C" else ""))
+                hint = ""
+                if unit == "°C":
+                    hint = (" - set up the temperature sensors below" if sensors.available() and not self._sens_alive
+                            else " - the sensors don't report this one" if self._sens_alive
+                            else " - is LibreHardwareMonitor running with its web server on?")
+                self.stat_now[s].set("not available" + hint)
             else:
                 self.stat_now[s].set(f"now {pcstats.to_byte(v)}{unit}  ({src})")
 
