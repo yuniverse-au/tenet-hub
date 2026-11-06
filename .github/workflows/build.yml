@@ -2,6 +2,7 @@ name: Build TENET Hub
 
 on:
   push:
+    branches: ["**"]      # every push builds TenetHub.exe (download it from the run's Artifacts)
     tags: ["v*"]          # e.g. git tag v1.0.0 && git push --tags  -> a Release with TenetHub.exe
   workflow_dispatch:
 

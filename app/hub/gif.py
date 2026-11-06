@@ -28,6 +28,7 @@ DEFAULTS = {
     "invert": False,
     "fit": "contain",       # contain | cover | stretch | original
     "zoom": 100,            # percent, on top of the fit
+    "rotate": 0,            # degrees clockwise, 0-360 (before the fit, so it fits the turned picture)
     "x": 0, "y": 0,         # move the picture (pixels)
     "trim_start": 0,        # first source frame to use
     "trim_end": 0,          # source frames to drop from the end
@@ -58,6 +59,9 @@ def _place(fr, s):
     """Scale/crop/position one frame onto the 256x32 screen (greyscale)."""
     bg = Image.new("RGBA", fr.size, (0, 0, 0, 255))
     g = Image.alpha_composite(bg, fr).convert("L")
+    angle = float(s.get("rotate", 0)) % 360
+    if angle:
+        g = g.rotate(-angle, resample=Image.BICUBIC, expand=True, fillcolor=0)
     w, h = g.size
     fit = s["fit"]
     if fit == "stretch":

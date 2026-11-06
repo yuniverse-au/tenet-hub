@@ -16,7 +16,7 @@ from .screen import to_4bpp
 MIN_PATCH = 20
 MAGIC = b"TBOT"
 IMAGE_OFF = 0x1000
-DEFAULTS = {k: gif.DEFAULTS[k] for k in ("brightness", "contrast", "gamma", "invert", "fit", "zoom", "x", "y")}
+DEFAULTS = {k: gif.DEFAULTS[k] for k in ("brightness", "contrast", "gamma", "invert", "fit", "zoom", "rotate", "x", "y")}
 
 # The firmware's built-in logo, for the preview (the keyboard has its own copy).
 _DEFAULT_PNG = "iVBORw0KGgoAAAANSUhEUgAAAQAAAAAgCAAAAADYwvk4AAACFklEQVR42u2YQUgUURjHfzPmLkpKiwmiB5Eiti51yOzQ4m2zU5duYZB4UNs6FEHpIfQgCwYtVISoHfTQQZCOW4cI8VBWBHWQIGihtSIsV0N03dWvQ7vr201rjWe8w/vBDHz/efzh/eebN/MGLBaLxWKxWLZBXFTiGTW9IR1B0WJegLCItMOWYzf3VAgrlyOKHhyPJ+cmQ6X/OBd35+Oq79xBc3fo0Zk6T1Xg9sua/90GERG5owppEfEXDEqLiHyt2LQD/EV4/k7lDxG5miv7RKSzrOmTyHSJqR1A9RWNZud3w9JItqq7BtF7y897ofGcsQFwuVqbldMFjHzPlq2l8JhfR5uhASy+pqJHm1vwAKzdypUB4D0QS8Mxj5kBSDd01OtyuwiMx3KlH5gDZB48DQYEMCMiIlN5WvQp3t4ix/6NhlPAzY16D5AEWAF8pq4B16H1kB6rCy48eVWwLGTnIQYEcNBxHMc5kS8+e4jbX+TYP1PeBgwoQgLwkjkljH0LdK9x+rgOo7M+eBtVhHfAXsD1weoHYwOYGYVmLU9A/goAk8B+YF8JTK8aGwA3klpsAodh9oGqjKUgCLQA9839EOLjXW3vwEhKVWbDcLKrrKkHXoyasBfIEFK0BEDVgmy1GwwVvReoTYksVBbcwOGMzZsaDO4Avg1oMOnYBYOL+dp6e8vE59T81KWjX+xvCovFYrFYLNvjJ5HoCNfIKlVoAAAAAElFTkSuQmCC"

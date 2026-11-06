@@ -31,7 +31,7 @@ TENET Hub sets the keyboard's clock from your PC (the same thing Hexcore Link do
 3. Click *Put it on the keyboard*. Uploads only rewrite frames that changed, and every frame is verified.
 4. Press the screen button until you reach the image screen.
 
-How many frames fit depends on the keyboard's flash chip (about 190 on a 1 MB chip, 440 on 2 MB); the tab shows the real number. Big changes between frames (more than half the screen) play at around 5-8 fps; small changes play faster. *Smoothness vs typing* trades the two. *Save as a package* keeps a GIF and its adjustments as a local animation package.
+How many frames fit depends on the keyboard's flash chip (about 190 on a 1 MB chip, 440 on 2 MB); the tab shows the real number. Big changes between frames (more than half the screen) play at around 5-8 fps; small changes play faster. *Smoothness vs typing* trades the two.
 
 ### Boot logo
 1. Open the **Boot logo** tab. The preview shows the built-in TENET 70 logo.

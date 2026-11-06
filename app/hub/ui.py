@@ -1,7 +1,6 @@
 """The window (tkinter) and tray icon (pystray)."""
 import os, queue, subprocess, sys, threading, time, traceback, webbrowser
 import tkinter as tk
-import tkinter.simpledialog
 from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageDraw
@@ -151,6 +150,7 @@ class App:
         self.nb = nb
         self._build_packages(nb)
         self._build_screens(nb)
+        self._build_stats(nb)
         self._build_gif(nb)
         self._build_boot(nb)
         self._build_firmware(nb)
@@ -325,7 +325,8 @@ class App:
         nb.add(f, text="Screens")
         ttk.Label(f, text="The keyboard's screen button goes through these screens, top to bottom. Turn screens "
                           "on or off and move them around. Every screen package gets a screen of its own; those "
-                          "only come up while TENET Hub is running, so the keyboard never stops on a blank one.",
+                          "and PC stats only come up while TENET Hub is running, so the keyboard never stops on "
+                          "a blank one.",
                   wraplength=820, justify="left").pack(anchor="w")
         body = ttk.Frame(f)
         body.pack(fill="both", expand=True, pady=6)
@@ -354,28 +355,40 @@ class App:
         ttk.Button(side, text="Reset to default", command=self.scr_reset).pack(fill="x", pady=(4, 0))
         self.scr_msg = tk.StringVar()
         ttk.Label(f, textvariable=self.scr_msg, foreground="#555", wraplength=820, justify="left").pack(anchor="w")
+        self.refresh_screens()
+
+    # --- PC stats tab ---------------------------------------------------------------------
+    def _build_stats(self, nb):
+        f = ttk.Frame(nb, padding=8)
+        nb.add(f, text="PC stats")
+        ttk.Label(f, text="The PC stats screen shows three numbers. Pick what each one measures. TENET Hub "
+                          "sends the values, so the screen only comes up while TENET Hub is running (turn it on "
+                          "or off and move it in the Screens tab).",
+                  wraplength=820, justify="left").pack(anchor="w")
         box = ttk.LabelFrame(f, text="PC stats screen", padding=8)
         box.pack(fill="x", pady=(8, 0))
-        k = pcstats.kinds(self.cfg)
+        src = pcstats.sources(self.cfg)
+        labels = [v[0] for v in pcstats.SOURCES.values()]
         self.stat_vars, self.stat_now = {}, {}
         for i, s in enumerate(pcstats.SLOTS):
-            ttk.Label(box, text=pcstats.NAMES[s]).grid(row=i, column=0, sticky="w", padx=(0, 8))
-            v = tk.StringVar(value=pcstats.KINDS[k[s]])
-            cb = ttk.Combobox(box, textvariable=v, values=list(pcstats.KINDS.values()), state="readonly", width=18)
+            ttk.Label(box, text=pcstats.SLOT_NAMES[s]).grid(row=i, column=0, sticky="w", padx=(0, 8))
+            v = tk.StringVar(value=pcstats.SOURCES[src[s]][0])
+            cb = ttk.Combobox(box, textvariable=v, values=labels, state="readonly", width=24)
             cb.grid(row=i, column=1, sticky="w", pady=1)
-            cb.bind("<<ComboboxSelected>>", lambda e: self._stats_kinds_changed())
+            cb.bind("<<ComboboxSelected>>", lambda e: self._stats_sources_changed())
             now = tk.StringVar(value="")
             ttk.Label(box, textvariable=now, foreground="#555").grid(row=i, column=2, sticky="w", padx=10)
             self.stat_vars[s], self.stat_now[s] = v, now
         ttk.Label(box, text="Temperatures come from LibreHardwareMonitor (run it as administrator and turn on "
                             "Options > Remote Web Server) or, for NVIDIA graphics cards, the NVIDIA driver. "
-                            "Usage comes from Windows. The keyboard shows 0-99.",
+                            "Usage and memory come from Windows. The keyboard shows 0-99. The CPU / GPU / DISK "
+                            "labels on the keyboard are drawn by its firmware and stay the same whatever you "
+                            "pick here.",
                   foreground="#555", wraplength=800, justify="left").grid(row=3, column=0, columnspan=3, sticky="w", pady=(6, 0))
-        self.refresh_screens()
 
-    def _stats_kinds_changed(self):
-        rev = {v: k for k, v in pcstats.KINDS.items()}
-        self.cfg.set("stats_kinds", {s: rev[v.get()] for s, v in self.stat_vars.items()})
+    def _stats_sources_changed(self):
+        rev = {v[0]: k for k, v in pcstats.SOURCES.items()}
+        self.cfg.set("stats_sources", {s: rev[v.get()] for s, v in self.stat_vars.items()})
         for s in pcstats.SLOTS:
             self.stat_now[s].set("")
 
@@ -487,6 +500,7 @@ class App:
         ("contrast", "Contrast (%)", 25, 300),
         ("gamma", "Gamma (%)", 30, 300),
         ("zoom", "Zoom (%)", 10, 400),
+        ("rotate", "Rotate (degrees)", 0, 360),
         ("x", "Move left / right", -256, 256),
         ("y", "Move up / down", -32, 32),
         ("trim_start", "Skip frames at the start", 0, 300),
@@ -505,7 +519,6 @@ class App:
         self.gif_combo.pack(side="left", padx=6)
         self.gif_combo.bind("<<ComboboxSelected>>", lambda e: self._gif_source_changed())
         ttk.Button(top, text="Open an image or GIF...", command=self.gif_open).pack(side="left")
-        ttk.Button(top, text="Save as a package...", command=self.gif_save_package).pack(side="left", padx=6)
         self.gif_view = tk.Label(f, background="black")
         self.gif_view.pack(pady=8)
         self.gif_info = tk.StringVar(value="Open an image or a GIF (or pick one of your animation packages).")
@@ -728,41 +741,13 @@ class App:
         self._with_keyboard(gif.clear, lambda r, err: self.gif_msg.set(
             f"Couldn't remove it: {err}" if err else "Removed. The image screen is blank now."))
 
-    def gif_save_package(self):
-        key = self._gif_key()
-        if not key:
-            return
-        kind, ref = self.gif_sources[self.gif_src.get()]
-        if kind == "pkg":
-            messagebox.showinfo(APP_NAME, "That's already a package. Your adjustments are saved automatically.")
-            return
-        name = tk.simpledialog.askstring(APP_NAME, "Name for this animation package:", parent=self.root)
-        if not name:
-            return
-        import json, re, shutil
-        pid = re.sub(r"[^a-z0-9_-]+", "-", name.lower()).strip("-")[:40] or "animation"
-        folder = os.path.join(self.reg.root, pid)
-        if os.path.exists(folder) and not messagebox.askyesno(APP_NAME, f"Replace the package '{pid}'?"):
-            return
-        os.makedirs(folder, exist_ok=True)
-        ext = os.path.splitext(ref)[1].lower() or ".gif"
-        shutil.copy(ref, os.path.join(folder, "animation" + ext))
-        json.dump({"id": pid, "name": name, "version": "1.0.0", "type": "animation",
-                   "file": "animation" + ext, "description": "A local image or animation for the image screen.",
-                   "gif_settings": self.gif_settings()},
-                  open(os.path.join(folder, "package.json"), "w", encoding="utf-8"), indent=2)
-        self.reg.scan()
-        self.refresh_gif_sources()
-        self.refresh_packages()
-        self.gif_src.set(f"{name} (package)")
-        self._gif_source_changed()
-
     # --- boot logo tab ---------------------------------------------------------------------
     BOOT_CONTROLS = [
         ("brightness", "Brightness", -100, 100),
         ("contrast", "Contrast (%)", 25, 300),
         ("gamma", "Gamma (%)", 30, 300),
         ("zoom", "Zoom (%)", 10, 400),
+        ("rotate", "Rotate (degrees)", 0, 360),
         ("x", "Move left / right", -256, 256),
         ("y", "Move up / down", -32, 32),
     ]

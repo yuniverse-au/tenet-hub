@@ -208,6 +208,13 @@ lhm = {"Text": "Sensor", "Children": [{"Text": "DESKTOP", "Children": [
 t = pcstats.lhm_temps(lhm)
 check(f"LibreHardwareMonitor temps: {t}", t == {"cpu": 61.3, "gpu": 54.0, "disk": 38.0})
 check("units bits: CPU and disk usage -> 0b101", pcstats.units_bits({"cpu": "usage", "gpu": "temp", "disk": "usage"}) == 0b101)
+cfg.data.pop("stats_sources", None); cfg.data["stats_kinds"] = {"cpu": "temp", "gpu": "usage"}
+check("old stats_kinds settings still read", pcstats.sources(cfg) == {"cpu": "cpu_temp", "gpu": "gpu_usage", "disk": "disk_usage"})
+cfg.data["stats_sources"] = {"cpu": "mem_usage", "gpu": "cpu_temp", "disk": "bogus"}
+check("stats_sources: memory in the left slot, unknown ids fall back",
+      pcstats.sources(cfg) == {"cpu": "mem_usage", "gpu": "cpu_temp", "disk": "disk_usage"}
+      and pcstats.units_bits(pcstats.kinds(cfg)) == 0b101)
+cfg.data.pop("stats_sources"); cfg.data.pop("stats_kinds")
 check("values clamp to 0-99", [pcstats.to_byte(v) for v in (None, -3, 42.6, 100, 250)] == [0, 0, 43, 99, 99])
 smp = pcstats.Sampler(cfg, log)
 check(f"sampler without sources (Linux): {smp.sample()}", all(v[0] is None for v in smp.sample().values()))
@@ -277,6 +284,9 @@ check(f"button -> PC stats; values sent {B.stats_values}, units {B.stats_units:#
       B.mode == 6 and B.stats_on and B.stats_values == (12, 61, 4) and B.stats_units == 0b101)
 cfg.set("stats_kinds", {"cpu": "temp", "gpu": "temp", "disk": "temp"}); host._tick()
 check("changing a slot to temperature updates the units", B.stats_units == 0)
+cfg.set("stats_sources", {"cpu": "mem_usage", "gpu": "gpu_temp", "disk": "disk_temp"}); host._tick()
+check("memory usage in a slot shows %", B.stats_units == 0b001)
+cfg.data.pop("stats_sources")
 B.press(); B.stats_values = None; host._stats_at = 0; host._tick()
 check("off the PC stats screen: no values sent", B.mode == 7 and B.stats_values is None)
 host.running["hello"].ctx.request_mode(5); host._tick()

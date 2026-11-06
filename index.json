@@ -8,15 +8,16 @@
     {
       "id": "nowplaying",
       "name": "Now Playing",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "type": "screen",
       "description": "Shows the song playing on your PC (Spotify, YouTube in a browser, any app that shows up in Windows' media controls): title, artist, time, a progress bar and an audio spectrum.",
       "requires_firmware": 6,
       "author": "Yuniverse",
       "default_mode": 5,
-      "url": "catalog/nowplaying-1.0.0.zip",
-      "sha256": "CA4467F1B32DB95CB058843255A2230F81A5CFAF1D9CC8ECA1AD923DBC67BF9C",
-      "size": 10781
+      "changelog": "The time shows hours (h:mm:ss) on tracks an hour or longer.",
+      "url": "catalog/nowplaying-1.0.1.zip",
+      "sha256": "F0A4BE7B357BB9298C51F529BF5482A936BC862014B4F7F727CB5381550C354F",
+      "size": 11147
     }
   ],
   "firmware": [

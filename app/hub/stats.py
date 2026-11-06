@@ -1,30 +1,60 @@
-"""PC stats for the keyboard's PC stats screen (REVIVER v24+): CPU, GPU and disk, each as a
-temperature (°C) or a usage (%), whichever the user picked. The keyboard shows two digits (0-99).
+"""PC stats for the keyboard's PC stats screen (REVIVER v24+). The screen has three slots (left,
+middle, right); the user picks what each one measures: CPU / GPU / disk usage or temperature, or
+memory usage. The keyboard shows two digits (0-99) and a °C or % mark per slot.
 
-Usage comes from Windows' performance counters (no admin needed):
-  CPU   \\Processor Information(_Total)\\% Processor Utility   (what Task Manager shows)
-  GPU   \\GPU Engine(*engtype_3D)\\Utilization Percentage      (summed over processes)
-  Disk  100 - \\PhysicalDisk(_Total)\\% Idle Time              (active time)
+Usage comes from Windows (no admin needed):
+  CPU     \\Processor Information(_Total)\\% Processor Utility   (what Task Manager shows)
+  GPU     \\GPU Engine(*engtype_3D)\\Utilization Percentage      (summed over processes)
+  Disk    100 - \\PhysicalDisk(_Total)\\% Idle Time              (active time)
+  Memory  GlobalMemoryStatusEx, dwMemoryLoad                      (RAM in use)
 
 Temperatures, in order of preference:
   LibreHardwareMonitor's web server (Options > Remote Web Server, default port 8085): CPU, GPU, disk
   NVIDIA's driver (nvml.dll): GPU
 Windows itself has no reliable CPU or disk temperature for normal programs, so those need
 LibreHardwareMonitor running (as administrator, with its web server on).
+
+Settings: cfg["stats_sources"] = {"cpu": "cpu_usage", "gpu": "gpu_temp", "disk": "disk_usage"}, keyed
+by slot (the slot keys are the stock screen's left / middle / right). The older cfg["stats_kinds"]
+({"cpu": "usage" | "temp", ...}) is still read when there is no stats_sources.
 """
 import ctypes, json, re, sys, threading, time, urllib.request
 
 SLOTS = ("cpu", "gpu", "disk")
+SLOT_NAMES = {"cpu": "Left", "gpu": "Middle", "disk": "Right"}
 NAMES = {"cpu": "CPU", "gpu": "GPU", "disk": "Disk"}
 KINDS = {"temp": "Temperature (°C)", "usage": "Usage (%)"}
-DEFAULT_KINDS = {"cpu": "usage", "gpu": "temp", "disk": "usage"}
+# source id -> (label, device, kind)
+SOURCES = {
+    "cpu_usage": ("CPU usage (%)", "cpu", "usage"),
+    "cpu_temp": ("CPU temperature (°C)", "cpu", "temp"),
+    "gpu_usage": ("GPU usage (%)", "gpu", "usage"),
+    "gpu_temp": ("GPU temperature (°C)", "gpu", "temp"),
+    "mem_usage": ("Memory usage (%)", "mem", "usage"),
+    "disk_usage": ("Disk usage (%)", "disk", "usage"),
+    "disk_temp": ("Disk temperature (°C)", "disk", "temp"),
+}
+DEFAULT_SOURCES = {"cpu": "cpu_usage", "gpu": "gpu_temp", "disk": "disk_usage"}
+DEFAULT_KINDS = {s: SOURCES[v][2] for s, v in DEFAULT_SOURCES.items()}
 LHM_URL = "http://localhost:8085/data.json"
 
 
+def sources(cfg):
+    """slot -> source id."""
+    out = dict(DEFAULT_SOURCES)
+    saved = cfg.get("stats_sources")
+    if isinstance(saved, dict):
+        out.update({s: v for s, v in saved.items() if s in SLOTS and v in SOURCES})
+    else:                                            # settings from before memory etc. were choices
+        for s, v in (cfg.get("stats_kinds") or {}).items():
+            if s in SLOTS and v in KINDS:
+                out[s] = f"{s}_{v}"
+    return out
+
+
 def kinds(cfg):
-    k = dict(DEFAULT_KINDS)
-    k.update({s: v for s, v in (cfg.get("stats_kinds") or {}).items() if s in SLOTS and v in KINDS})
-    return k
+    """slot -> "usage" | "temp"."""
+    return {s: SOURCES[v][2] for s, v in sources(cfg).items()}
 
 
 def units_bits(k):
@@ -94,6 +124,27 @@ class _Pdh:
             idle = self._one(self.h["disk"])
             out["disk"] = None if idle is None else 100 - idle
         return {k: (None if v is None else max(0.0, min(100.0, v))) for k, v in out.items()}
+
+
+class _MemStatus(ctypes.Structure):
+    _fields_ = [("dwLength", ctypes.c_uint32), ("dwMemoryLoad", ctypes.c_uint32),
+                ("ullTotalPhys", ctypes.c_uint64), ("ullAvailPhys", ctypes.c_uint64),
+                ("ullTotalPageFile", ctypes.c_uint64), ("ullAvailPageFile", ctypes.c_uint64),
+                ("ullTotalVirtual", ctypes.c_uint64), ("ullAvailVirtual", ctypes.c_uint64),
+                ("ullAvailExtendedVirtual", ctypes.c_uint64)]
+
+
+def mem_usage():
+    """RAM in use (%), or None where Windows' GlobalMemoryStatusEx isn't available."""
+    if sys.platform != "win32":
+        return None
+    m = _MemStatus()
+    m.dwLength = ctypes.sizeof(m)
+    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m)):
+        return None
+    if m.ullTotalPhys:
+        return 100.0 * (m.ullTotalPhys - m.ullAvailPhys) / m.ullTotalPhys
+    return float(m.dwMemoryLoad)
 
 
 # --- temperatures ----------------------------------------------------------------------------
@@ -226,17 +277,21 @@ class Sampler:
         return out, src
 
     def sample(self):
-        k = kinds(self.cfg)
-        usage = self._usage() if "usage" in k.values() else {}
-        temps, src = self._temps() if "temp" in k.values() else ({}, {})
+        src_of = sources(self.cfg)
+        need = {SOURCES[v][1:] for v in src_of.values()}          # {(device, kind)}
+        usage = self._usage() if any(k == "usage" and d != "mem" for d, k in need) else {}
+        if ("mem", "usage") in need:
+            usage["mem"] = mem_usage()
+        temps, src = self._temps() if any(k == "temp" for _, k in need) else ({}, {})
         out = {}
         for s in SLOTS:
-            if k[s] == "usage":
-                v = usage.get(s)
+            _, dev, kind = SOURCES[src_of[s]]
+            if kind == "usage":
+                v = usage.get(dev)
                 out[s] = (v, "%", "Windows" if v is not None else None)
             else:
-                v = temps.get(s)
-                out[s] = (v, "°C", src.get(s))
+                v = temps.get(dev)
+                out[s] = (v, "°C", src.get(dev))
         return out
 
     def values(self):

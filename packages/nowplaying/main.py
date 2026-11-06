@@ -101,9 +101,14 @@ class Spectrum:  # noqa: copied from nowplaying_live.py
 
 
 
-def mmss(s):
+def mmss(s, hours=False):
+    """m:ss, or h:mm:ss once it's an hour or more (or when `hours`, so both sides of
+    "pos / dur" match on a long track)."""
     s = int(s)
-    return f"{s // 60}:{s % 60:02d}"
+    h, m, sec = s // 3600, s // 60 % 60, s % 60
+    if h or hours:
+        return f"{h}:{m:02d}:{sec:02d}"
+    return f"{s // 60}:{sec:02d}"
 
 
 class Package(api.ScreenPackage):
@@ -212,7 +217,8 @@ class Package(api.ScreenPackage):
         dur = info["dur"]
         when = ""
         if pos is not None and dur:
-            when = f"{mmss(pos)} / {mmss(dur)}"
+            long = dur >= 3600
+            when = f"{mmss(pos, long)} / {mmss(dur, long)}"
             if not info["playing"]:
                 when = "paused  " + when
         tw = d.textlength(when, font=self.small_font)

@@ -20,7 +20,7 @@ STOCK = {                     # in default order
     3: "Clock",
     4: "Logo (the image Hexcore Link uploaded)",
     6: "Image screen",
-    8: "PC stats (CPU / GPU / disk)",
+    8: "PC stats",
     7: "Typing animation",
 }
 DEFAULT_ON = {1, 6, 7, 8}
@@ -71,7 +71,7 @@ def entries(cfg, reg):
             e["kind"] = "Package"
         else:
             e["name"] = STOCK[int(e["id"][6:])]
-            e["kind"] = "Built in, with Hub" if int(e["id"][6:]) in NEEDS_HUB else "Built in"
+            e["kind"] = "Built in"
     return out
 
 
