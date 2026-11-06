@@ -3,8 +3,9 @@
 Firmware updates and screen packages for the **Metakey TENET 70** keyboard (Hexcore PCB) and its 256×32 OLED screen.
 
 - **Packages** draw live content on the keyboard's screen, like the song that's playing. Background packages can also react to PC events. New packages and updates are found automatically from this repository.
-- **GIF screen**: store an image or an animation on the keyboard and it shows by itself, even with the PC off. Before uploading you can set a frame-rate cap, brightness/contrast/gamma/invert, fit/zoom/position and trimming, with a live preview.
-- **Firmware**: installs **REVIVER**, our custom firmware for the TENET 70. It adds the GIF screen, live drawing, tear-free scrolling, a custom boot logo and more. You can go back to the official firmware at any time.
+- **Image screen**: store an image or an animation on the keyboard and it shows by itself, even with the PC off. Before uploading you can set a frame-rate cap, brightness/contrast/gamma/invert, fit/zoom/position and trimming, with a live preview.
+- **Boot logo**: the keyboard shows a TENET 70 logo when it powers on. Put your own image there instead, or go back to the TENET 70 logo, from the Boot logo tab.
+- **Firmware**: installs **REVIVER**, our custom firmware for the TENET 70. It adds the image screen, a changeable boot logo, live drawing, tear-free scrolling and more. You can go back to the official firmware at any time.
 - **Burn-in care**: the screen turns off while your PC sleeps or shuts down, or after you've been away for a while, and package screens shift by a pixel or two every few minutes.
 
 ## Install
@@ -14,13 +15,20 @@ Firmware updates and screen packages for the **Metakey TENET 70** keyboard (Hexc
 3. Open the **Firmware** tab and install the latest **REVIVER** firmware. It takes about a minute; keep the keyboard plugged in.
 4. On the **Packages** tab, turn on the packages you want. Now Playing is included and shows on the keyboard's *Custom Text* screen. Press the keyboard's screen button to get there.
 
-### GIF screen
-1. Open the **GIF screen** tab and open an image (PNG, JPG, BMP...) or a GIF, or pick an animation package.
+### Image screen
+1. Open the **Image screen** tab and open an image (PNG, JPG, BMP...) or a GIF, or pick an animation package.
 2. Adjust it while watching the preview. The line under the preview shows how much of the keyboard's storage it uses.
 3. Click *Put it on the keyboard*. Uploads only rewrite frames that changed, and every frame is verified.
-4. Press the screen button until you reach the GIF screen. REVIVER's screen button goes Dashboard → Now Playing → GIF screen → typing animation; the KPM, clock and Logo screens are skipped.
+4. Press the screen button until you reach the image screen. REVIVER's screen button goes Dashboard → Now Playing → image screen → typing animation; the KPM, clock and Logo screens are skipped.
 
 How many frames fit depends on the keyboard's flash chip (about 190 on a 1 MB chip, 440 on 2 MB); the tab shows the real number. Big changes between frames (more than half the screen) play at around 5-8 fps; small changes play faster. *Smoothness vs typing* trades the two. *Save as a package* keeps a GIF and its adjustments as a local animation package.
+
+### Boot logo
+1. Open the **Boot logo** tab. The preview shows the built-in TENET 70 logo.
+2. Open an image and adjust it (fit, zoom, position, brightness/contrast/gamma, invert). For a GIF, the first frame is used.
+3. Click *Put it on the keyboard*. You'll see it the next time the keyboard powers on. *Restore the TENET 70 logo* goes back to the built-in one.
+
+The boot logo has its own 8 KB of the keyboard's flash chip, so it never uses image screen frames. It needs REVIVER v20 or newer.
 
 ### If something goes wrong
 Unplug the keyboard, **hold Esc while plugging it back in** (it starts in update mode), then install the official firmware from the Firmware tab. Typing keeps working on every REVIVER version.

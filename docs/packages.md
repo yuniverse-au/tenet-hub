@@ -69,7 +69,7 @@ class Package(api.BackgroundPackage):
 ```
 
 ## Animation package
-A GIF for the keyboard's GIF screen, with the adjustments it looks best with. It doesn't run any code: it shows up in the GIF screen tab.
+A GIF for the keyboard's image screen, with the adjustments it looks best with. It doesn't run any code: it shows up in the Image screen tab.
 ```json
 {
   "id": "my-loop", "name": "My loop", "version": "1.0.0", "type": "animation",

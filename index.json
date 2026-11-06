@@ -21,22 +21,22 @@
   ],
   "firmware": [
     {
-      "name": "REVIVER v19",
-      "patch_version": 19,
-      "notes": "GIF screen: store an image or animation on the keyboard and it shows by itself, even with the PC off (upload from the GIF screen tab). The screen button now goes Dashboard, Now Playing, GIF screen, typing animation in both directions (KPM, clock and Logo screens skipped). Also: recovery from a stuck GIF screen, safe flash-chip access, live drawing for packages, tear-free scrolling, Yuniverse boot logo, screen-off support.",
+      "name": "REVIVER v20",
+      "patch_version": 20,
+      "notes": "Custom boot logo: the keyboard now shows a TENET 70 logo when it powers on, and you can put your own image there from the Boot logo tab. Image screen: store an image or animation on the keyboard and it shows by itself, even with the PC off (upload from the Image screen tab). The screen button goes Dashboard, Now Playing, Image screen, typing animation in both directions (KPM, clock and Logo screens skipped). Also: recovery from a stuck image screen, safe flash-chip access, live drawing for packages, tear-free scrolling, screen-off support.",
       "base": {
         "version": "3.0.7",
         "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
         "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
         "size": 86620
       },
-      "id": "v19",
+      "id": "v20",
       "patch": {
-        "url": "firmware/v19/patch.json",
-        "sha256": "D769856CE4075260BC00582B759736C562455A0623FA859F46210DD09AD8D307"
+        "url": "firmware/v20/patch.json",
+        "sha256": "3023FA83B897F13DA6783B726D4A6B0398C4E316A8AC6F39EF4107126E89C2D3"
       },
-      "result_sha256": "D256B8DE9D728BA66E97753481C487C40B0F7A410930C74FCD1198296369EE3B",
-      "result_size": 91584,
+      "result_sha256": "E943E39AFC61B3CBBB538B8020875E568FAA0F7CCB925FC49EEB5B2BC7E30FE4",
+      "result_size": 91396,
       "base_sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56"
     }
   ]

@@ -1,4 +1,4 @@
-"""The keyboard's GIF screen (screen 6, REVIVER v16+).
+"""The keyboard's image screen (screen 6, REVIVER v16+).
 
 The animation is stored on the keyboard's flash chip and the firmware plays it by itself, even
 with the PC off. This module turns any GIF into keyboard frames (with the user's adjustments) and
@@ -18,7 +18,7 @@ from .screen import to_4bpp
 W, H = 256, 32
 MAGIC = b"TGIF"
 FRAME_BYTES = 4096
-MIN_PATCH = 16         # v14 crashed switching to the GIF screen; v15 refused uploads
+MIN_PATCH = 16         # v14 crashed switching to the image screen; v15 refused uploads
 
 DEFAULTS = {
     "fps_cap": 12,          # never faster than this (lower it if playback stutters)
@@ -146,7 +146,7 @@ def _o24(v):
 
 
 def info(kb):
-    """-> dict(chip, capacity, frames) or None if the firmware has no GIF screen."""
+    """-> dict(chip, capacity, frames) or None if the firmware has no image screen."""
     r = kb.cmd(0x15)
     if not r or r[0] != 0 or len(r) < 13:
         return None
@@ -180,7 +180,7 @@ def upload(kb, frames, burst, progress=lambda frac, msg: None):
     """Stores the animation on the keyboard. Unchanged frames are skipped (checked by CRC)."""
     inf = info(kb)
     if inf is None:
-        raise GifError(f"This keyboard's firmware has no GIF screen (needs REVIVER v{MIN_PATCH}+).")
+        raise GifError(f"This keyboard's firmware has no image screen (needs REVIVER v{MIN_PATCH}+).")
     if inf["capacity"] == 0:
         raise GifError("This keyboard's flash chip has no room for a GIF.")
     if len(frames) > inf["capacity"]:

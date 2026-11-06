@@ -30,7 +30,7 @@ WIDTH, HEIGHT = 256, 32
 
 # Keyboard screens a package can take over. The firmware draws nothing there (REVIVER v12+), so a
 # package's drawing isn't overwritten. (The Logo screen was removed in v19: still images go on the
-# GIF screen now.)
+# Image screen now.)
 PACKAGE_MODES = {5: "Custom Text screen"}
 
 

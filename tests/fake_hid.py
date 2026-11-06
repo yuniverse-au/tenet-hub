@@ -1,4 +1,4 @@
-"""A fake TENET 70 for tests: speaks the vendor protocol (REVIVER v19) and the IAP protocol.
+"""A fake TENET 70 for tests: speaks the vendor protocol (REVIVER v20) and the IAP protocol.
 Install with sys.modules['hid'] = fake_hid. Records everything and flags pipelined packets."""
 import struct, threading, time
 
@@ -6,7 +6,7 @@ VID, PID = 0x3311, 0xF005
 
 
 class Board:
-    def __init__(self, patch=19):
+    def __init__(self, patch=20):
         self.patch = patch
         self.state = "app"          # "app" | "iap" | "gone"
         self.mode = 5
@@ -23,13 +23,18 @@ class Board:
 
     def _gif(self, sub, a):
         import zlib
-        base = 0x40000
+        base, size = 0x40000, self.chip - 0x40000
+        if sub >= 0x1B:                                # v20: same ops on the boot-logo area
+            base, size, sub = 0x3E000, 0x2000, sub - 5
         o24 = lambda b: b[0] | b[1] << 8 | b[2] << 16
-        ok = lambda off, n: n <= self.chip - base and off <= self.chip - base - n
+        ok = lambda off, n: n <= size and off <= size - n
         if sub == 0x15:
             h = self.spi[base:base + 8]
             frames = struct.unpack_from("<H", h, 6)[0] if h[:4] == b"TGIF" and h[4] == 1 else 0
-            return b"\x00" + struct.pack("<IIHH", self.chip, base, (self.chip - base - 0x1000) // 4096, frames)
+            r = b"\x00" + struct.pack("<IIHH", self.chip, base, (self.chip - base - 0x1000) // 4096, frames)
+            if self.patch >= 20:
+                r += bytes([self.spi[0x3E000:0x3E004] == b"TBOT" and self.spi[0x3E004] == 1])
+            return r
         off = o24(a)
         if sub == 0x16 and off % 4096 == 0 and ok(off, 4096):
             self.spi[base + off:base + off + 4096] = b"\xff" * 4096
@@ -86,6 +91,8 @@ class Board:
             if sub == 0x14 and self.patch >= 13:
                 return R(cmd, b"\x00TH" + bytes([self.patch, 0]))
             if 0x15 <= sub <= 0x19 and self.patch >= 14:
+                return R(cmd, self._gif(sub, args))
+            if 0x1B <= sub <= 0x1E and self.patch >= 20:
                 return R(cmd, self._gif(sub, args))
             return None
         R = lambda c, pl=b"": self.reply(bytes([0x7B, 0x10, 0x13, 0x10]), c, pl)

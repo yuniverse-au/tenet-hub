@@ -50,7 +50,7 @@ def step(i=0):
     if i < len(tabs):
         app.nb.select(tabs[i])
         wait = 600
-        if app.nb.tab(tabs[i], "text") == "GIF screen" and app.gif_sources:
+        if app.nb.tab(tabs[i], "text") == "Image screen" and app.gif_sources:
             app.gif_src.set(list(app.gif_sources)[0])
             app._gif_source_changed()
             wait = 6000

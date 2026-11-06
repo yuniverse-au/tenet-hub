@@ -6,7 +6,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageDraw
 
-from . import APP_NAME, VERSION, api, firmware, flasher, gif
+from . import APP_NAME, VERSION, api, bootlogo, firmware, flasher, gif
 from .device import Keyboard, enumerate_keyboards
 from .config import data_dir, set_start_at_login
 
@@ -148,6 +148,7 @@ class App:
         self.nb = nb
         self._build_packages(nb)
         self._build_gif(nb)
+        self._build_boot(nb)
         self._build_firmware(nb)
         self._build_settings(nb)
 
@@ -196,13 +197,13 @@ class App:
                 mode = pc.get("mode") or info.get("default_mode")
                 screen = api.PACKAGE_MODES.get(mode, "-")
             elif info.get("type") == "animation":
-                screen = "GIF screen"
+                screen = "Image screen"
             else:
                 screen = "(background)"
             if not m:
                 status, tag = ("New - not installed" if pid in new else "Not installed"), ("new" if pid in new else "")
             elif m["type"] == "animation":
-                status, tag = "Animation (use it from the GIF screen tab)", ""
+                status, tag = "Animation (use it from the Image screen tab)", ""
             elif pid in self.host.problems:
                 status, tag = self.host.problems[pid], "problem"
             elif pid in self.host.running:
@@ -309,7 +310,7 @@ class App:
         PackageSettings(self, m)
 
 
-    # --- GIF screen tab ----------------------------------------------------------------------
+    # --- Image screen tab ----------------------------------------------------------------------
     GIF_CONTROLS = [
         ("fps_cap", "Frame-rate cap (fps)", 1, 30),
         ("brightness", "Brightness", -100, 100),
@@ -325,7 +326,7 @@ class App:
 
     def _build_gif(self, nb):
         f = ttk.Frame(nb, padding=8)
-        nb.add(f, text="GIF screen")
+        nb.add(f, text="Image screen")
         top = ttk.Frame(f)
         top.pack(fill="x")
         ttk.Label(top, text="Image or GIF:").pack(side="left")
@@ -371,7 +372,7 @@ class App:
         bar.pack(fill="x", pady=(10, 2))
         self.b_gif_upload = ttk.Button(bar, text="Put it on the keyboard", command=self.gif_upload)
         self.b_gif_upload.pack(side="left")
-        ttk.Button(bar, text="Show the GIF screen", command=self.gif_show).pack(side="left", padx=6)
+        ttk.Button(bar, text="Show the image screen", command=self.gif_show).pack(side="left", padx=6)
         ttk.Button(bar, text="Remove from keyboard", command=self.gif_clear).pack(side="left")
         self.gif_progress = ttk.Progressbar(f, mode="determinate", maximum=1.0)
         self.gif_progress.pack(fill="x", pady=(6, 0))
@@ -520,7 +521,7 @@ class App:
             return
         fw = self.host.fw
         if fw and not fw.at_least(gif.MIN_PATCH):
-            messagebox.showinfo(APP_NAME, f"The GIF screen needs REVIVER v{gif.MIN_PATCH} or newer. "
+            messagebox.showinfo(APP_NAME, f"The image screen needs REVIVER v{gif.MIN_PATCH} or newer. "
                                           "Install it from the Firmware tab first.")
             return
         frames, burst = list(self.gif_frames), self.gif_settings()["burst"]
@@ -541,13 +542,13 @@ class App:
                 messagebox.showerror(APP_NAME, str(err))
             else:
                 self.gif_kbinfo = inf
-                self.gif_msg.set(f"Stored {inf['frames']} frame{'s' if inf['frames'] != 1 else ''}. It shows on the GIF screen, even with the PC off.")
+                self.gif_msg.set(f"Stored {inf['frames']} frame{'s' if inf['frames'] != 1 else ''}. It shows on the image screen, even with the PC off.")
         self._with_keyboard(fn, done)
 
     def gif_show(self):
         fw = self.host.fw
         if not (fw and fw.at_least(gif.MIN_PATCH)):
-            messagebox.showinfo(APP_NAME, f"The GIF screen needs REVIVER v{gif.MIN_PATCH} or newer (Firmware tab).")
+            messagebox.showinfo(APP_NAME, f"The image screen needs REVIVER v{gif.MIN_PATCH} or newer (Firmware tab).")
             return
         self.host._request("mode", 6)
 
@@ -555,7 +556,7 @@ class App:
         if self.busy or not messagebox.askyesno(APP_NAME, "Remove the animation stored on the keyboard?"):
             return
         self._with_keyboard(gif.clear, lambda r, err: self.gif_msg.set(
-            f"Couldn't remove it: {err}" if err else "Removed. The GIF screen is blank now."))
+            f"Couldn't remove it: {err}" if err else "Removed. The image screen is blank now."))
 
     def gif_save_package(self):
         key = self._gif_key()
@@ -577,7 +578,7 @@ class App:
         ext = os.path.splitext(ref)[1].lower() or ".gif"
         shutil.copy(ref, os.path.join(folder, "animation" + ext))
         json.dump({"id": pid, "name": name, "version": "1.0.0", "type": "animation",
-                   "file": "animation" + ext, "description": "A local image or animation for the GIF screen.",
+                   "file": "animation" + ext, "description": "A local image or animation for the image screen.",
                    "gif_settings": self.gif_settings()},
                   open(os.path.join(folder, "package.json"), "w", encoding="utf-8"), indent=2)
         self.reg.scan()
@@ -585,6 +586,168 @@ class App:
         self.refresh_packages()
         self.gif_src.set(f"{name} (package)")
         self._gif_source_changed()
+
+    # --- boot logo tab ---------------------------------------------------------------------
+    BOOT_CONTROLS = [
+        ("brightness", "Brightness", -100, 100),
+        ("contrast", "Contrast (%)", 25, 300),
+        ("gamma", "Gamma (%)", 30, 300),
+        ("zoom", "Zoom (%)", 10, 400),
+        ("x", "Move left / right", -256, 256),
+        ("y", "Move up / down", -32, 32),
+    ]
+
+    def _build_boot(self, nb):
+        f = ttk.Frame(nb, padding=8)
+        nb.add(f, text="Boot logo")
+        ttk.Label(f, text="The boot logo shows for 3 seconds when the keyboard powers on. REVIVER shows the "
+                          "TENET 70 logo unless you put your own image here (the first frame of a GIF is used).",
+                  wraplength=820, justify="left").pack(anchor="w")
+        top = ttk.Frame(f)
+        top.pack(fill="x", pady=(6, 0))
+        ttk.Button(top, text="Open an image...", command=self.boot_open).pack(side="left")
+        ttk.Button(top, text="Preview the TENET 70 logo", command=self.boot_preview_default).pack(side="left", padx=6)
+        self.boot_src_var = tk.StringVar(value="")
+        ttk.Label(top, textvariable=self.boot_src_var, foreground="#555").pack(side="left", padx=6)
+        self.boot_view = tk.Label(f, background="black")
+        self.boot_view.pack(pady=8)
+        grid = ttk.Frame(f)
+        grid.pack(fill="x", pady=6)
+        self.boot_vars = {}
+        for i, (key, label, lo, hi) in enumerate(self.BOOT_CONTROLS):
+            r, col = i // 2, (i % 2) * 3
+            ttk.Label(grid, text=label).grid(row=r, column=col, sticky="w", padx=(0, 4))
+            v = tk.IntVar(value=bootlogo.DEFAULTS[key])
+            val = ttk.Label(grid, width=5, text=str(bootlogo.DEFAULTS[key]))
+            ttk.Scale(grid, from_=lo, to=hi, length=170, variable=v,
+                      command=lambda x, v=v, val=val: (val.configure(text=str(int(float(x)))),
+                                                       self._boot_changed())).grid(row=r, column=col + 1, sticky="w")
+            val.grid(row=r, column=col + 2, sticky="w", padx=(2, 16))
+            self.boot_vars[key] = (v, val)
+        row = ttk.Frame(f)
+        row.pack(fill="x", pady=(4, 0))
+        ttk.Label(row, text="Fit:").pack(side="left")
+        self.boot_fit = tk.StringVar(value=gif.FITS["contain"])
+        cb = ttk.Combobox(row, textvariable=self.boot_fit, values=list(gif.FITS.values()), state="readonly", width=16)
+        cb.pack(side="left", padx=6)
+        cb.bind("<<ComboboxSelected>>", lambda e: self._boot_changed())
+        self.boot_invert = tk.BooleanVar(value=False)
+        ttk.Checkbutton(row, text="Invert", variable=self.boot_invert, command=self._boot_changed).pack(side="left", padx=10)
+        ttk.Button(row, text="Reset adjustments", command=self.boot_reset).pack(side="left")
+        bar = ttk.Frame(f)
+        bar.pack(fill="x", pady=(10, 0))
+        self.b_boot_upload = ttk.Button(bar, text="Put it on the keyboard", command=self.boot_upload, state="disabled")
+        self.b_boot_upload.pack(side="left")
+        ttk.Button(bar, text="Restore the TENET 70 logo", command=self.boot_restore).pack(side="left", padx=6)
+        self.boot_progress = ttk.Progressbar(f, mode="determinate", maximum=1.0)
+        self.boot_progress.pack(fill="x", pady=(6, 0))
+        self.boot_msg = tk.StringVar()
+        ttk.Label(f, textvariable=self.boot_msg, foreground="#555").pack(anchor="w")
+        self.boot_img, self.boot_job = None, None
+        self.boot_path = self.cfg.get("boot_file")
+        saved = self.cfg.get("boot_settings") or {}
+        self._boot_apply(dict(bootlogo.DEFAULTS, **saved))
+        if self.boot_path and os.path.exists(self.boot_path):
+            self._boot_changed(save=False)
+        else:
+            self.boot_path = None
+            self.boot_preview_default()
+
+    def _boot_apply(self, s):
+        for key, (v, val) in self.boot_vars.items():
+            v.set(int(s[key]))
+            val.configure(text=str(int(s[key])))
+        self.boot_fit.set(gif.FITS.get(s["fit"], gif.FITS["contain"]))
+        self.boot_invert.set(bool(s["invert"]))
+
+    def boot_settings(self):
+        s = {k: int(v.get()) for k, (v, _) in self.boot_vars.items()}
+        s["fit"] = next((k for k, n in gif.FITS.items() if n == self.boot_fit.get()), "contain")
+        s["invert"] = bool(self.boot_invert.get())
+        return s
+
+    def _boot_show(self, img):
+        from PIL import ImageTk
+        self._boot_photo = ImageTk.PhotoImage(img.resize((768, 96), Image.NEAREST))
+        self.boot_view.configure(image=self._boot_photo)
+
+    def boot_preview_default(self):
+        self.boot_img = None
+        self.b_boot_upload.configure(state="disabled")
+        self.boot_src_var.set("Built-in TENET 70 logo (what the keyboard shows by default)")
+        self._boot_show(bootlogo.default_image())
+
+    def boot_open(self):
+        p = filedialog.askopenfilename(title="Choose an image for the boot logo", filetypes=[
+            ("Images", "*.png *.gif *.jpg *.jpeg *.bmp *.webp *.tif *.tiff"), ("All files", "*.*")])
+        if not p:
+            return
+        self.boot_path = p
+        self.cfg.set("boot_file", p)
+        self._boot_changed(save=False)
+
+    def boot_reset(self):
+        self._boot_apply(dict(bootlogo.DEFAULTS))
+        self._boot_changed()
+
+    def _boot_changed(self, save=True):
+        if save:
+            self.cfg.set("boot_settings", self.boot_settings())
+        if not self.boot_path:
+            return
+        if self.boot_job:
+            self.root.after_cancel(self.boot_job)
+        self.boot_job = self.root.after(200, self._boot_convert)
+
+    def _boot_convert(self):
+        self.boot_job = None
+        path, s = self.boot_path, self.boot_settings()
+
+        def done(img, err):
+            if path != self.boot_path:
+                return
+            if err:
+                self.boot_img = None
+                self.b_boot_upload.configure(state="disabled")
+                self.boot_src_var.set(f"Can't use that file: {err}")
+                return
+            self.boot_img = img
+            self.b_boot_upload.configure(state="normal")
+            self.boot_src_var.set(os.path.basename(path))
+            self._boot_show(img)
+        self._thread(lambda: bootlogo.convert(path, s), done)
+
+    def _boot_fw_ok(self):
+        fw = self.host.fw
+        if fw and not fw.at_least(bootlogo.MIN_PATCH):
+            messagebox.showinfo(APP_NAME, f"Changing the boot logo needs REVIVER v{bootlogo.MIN_PATCH} or newer. "
+                                          "Install it from the Firmware tab first.")
+            return False
+        return True
+
+    def boot_upload(self):
+        if self.boot_img is None or self.busy or not self._boot_fw_ok():
+            return
+        img = self.boot_img
+        self.b_boot_upload.configure(state="disabled")
+
+        def progress(frac, msg):
+            self.ui(lambda: (self.boot_progress.configure(value=frac), self.boot_msg.set(msg)))
+
+        def done(r, err):
+            self.b_boot_upload.configure(state="normal")
+            if err:
+                self.boot_msg.set(f"Not stored: {err}")
+                messagebox.showerror(APP_NAME, str(err))
+        self._with_keyboard(lambda kb: bootlogo.upload(kb, img, progress), done)
+
+    def boot_restore(self):
+        if self.busy or not self._boot_fw_ok():
+            return
+        self._with_keyboard(bootlogo.restore, lambda r, err: (
+            self.boot_msg.set(f"Couldn't restore it: {err}" if err else
+                              "Restored. The keyboard shows the TENET 70 logo when it powers on."),
+            self.boot_progress.configure(value=0)))
 
     # --- firmware tab ----------------------------------------------------------------------
     def _build_firmware(self, nb):
