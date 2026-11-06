@@ -39,6 +39,25 @@
       "result_sha256": "68DD94544ED6D626068351FBE63478D4F1F5DDD714482F8AB9F7814054BB712F",
       "result_size": 92823,
       "base_sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56"
+    },
+    {
+      "name": "REVIVER v25",
+      "patch_version": 25,
+      "notes": "PC stats labels follow what each number measures: CPU, GPU, RAM or DISK (pick in the PC stats tab), drawn in the keyboard's own label style. Everything from v24: PC stats as a built-in screen with temperature or usage per number, your own screen list, a screen for every screen package, changeable boot logo, the image screen, live drawing, tear-free scrolling, screen-off support.",
+      "base": {
+        "version": "3.0.7",
+        "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
+        "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
+        "size": 86620
+      },
+      "id": "v25",
+      "patch": {
+        "url": "firmware/v25/patch.json",
+        "sha256": "FD48E366AF6669A9288988D597B3EFEE2F0C0A8B37F4D5672808DD82AD237627"
+      },
+      "result_sha256": "7C170DEC40F53CE225C50CC7FDE964C4702EE9BD05BC58551599A4395D26D29E",
+      "result_size": 93740,
+      "base_sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56"
     }
   ]
 }

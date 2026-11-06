@@ -48,7 +48,7 @@ reg = Registry(cfg, log)
 # --- catalogue -----------------------------------------------------------------------------------
 new, upd = reg.refresh()
 check(f"catalogue fetched: new={new} updates={upd} firmware={[f['id'] for f in reg.firmware_releases()]}",
-      new == ["nowplaying"] and upd == [] and reg.firmware_releases()[0]["patch_version"] == 24)
+      new == ["nowplaying"] and upd == [] and reg.firmware_releases()[0]["patch_version"] == 25)
 m = reg.install("nowplaying")
 check(f"installed {m['id']} {m['version']}; no longer 'new'", "nowplaying" in reg.installed and reg.new_ids() == [])
 
@@ -109,7 +109,7 @@ except ValueError as e:
 rel = reg.firmware_releases()[0]
 rel = dict(rel, base=dict(rel["base"], url=firmware.OFFICIAL_307["url"]))   # local copy instead of Hexcore
 img = firmware.build(rel, INDEX)
-check(f"v24 rebuilt from official + patch, sha {firmware.sha256(img)[:16]}", img == open(PATCHED, "rb").read())
+check(f"v25 rebuilt from official + patch, sha {firmware.sha256(img)[:16]}", img == open(PATCHED, "rb").read())
 bad = dict(rel, patch=dict(rel["patch"], sha256="00" * 32))
 try:
     firmware.build(bad, INDEX)
@@ -121,7 +121,7 @@ B = fake_hid.BOARD
 B.patch, B.state = 0, "app"            # official firmware on the keyboard
 steps = []
 flasher.flash(img, {rel["result_sha256"]}, lambda f, msg: steps.append(msg))
-check(f"flashed: {len(B.flash)} bytes match v24, back in normal mode, no pipelined packets",
+check(f"flashed: {len(B.flash)} bytes match v25, back in normal mode, no pipelined packets",
       bytes(B.flash[:len(img)]) == img and B.state == "app" and B.violations == 0)
 try:
     flasher.flash(img + b"x", {rel["result_sha256"]})

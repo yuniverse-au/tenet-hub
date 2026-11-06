@@ -1,0 +1,11 @@
+{
+  "name": "REVIVER v25",
+  "patch_version": 25,
+  "notes": "PC stats labels follow what each number measures: CPU, GPU, RAM or DISK (pick in the PC stats tab), drawn in the keyboard's own label style. Everything from v24: PC stats as a built-in screen with temperature or usage per number, your own screen list, a screen for every screen package, changeable boot logo, the image screen, live drawing, tear-free scrolling, screen-off support.",
+  "base": {
+    "version": "3.0.7",
+    "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
+    "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
+    "size": 86620
+  }
+}
