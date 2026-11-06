@@ -1,0 +1,6 @@
+# Keep line endings identical on every OS: the catalogue checksums depend on exact file bytes.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.zip binary
+*.gif binary
+*.png binary
