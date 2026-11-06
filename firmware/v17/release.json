@@ -1,0 +1,11 @@
+{
+  "name": "REVIVER v17",
+  "patch_version": 17,
+  "notes": "GIF screen: store an animation on the keyboard and it plays by itself, even with the PC off (replaces the Monitor screen; upload from the GIF screen tab). v17 recovers if the GIF screen was left stuck by an earlier crash, keeps screen switching responsive during long GIF frames, and can report the player's state for troubleshooting. Also: safe flash-chip access, live drawing for packages, tear-free scrolling, Yuniverse boot logo, screen button skips KPM and clock, blank Custom Text screen for Now Playing, screen-off support.",
+  "base": {
+    "version": "3.0.7",
+    "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
+    "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
+    "size": 86620
+  }
+}
