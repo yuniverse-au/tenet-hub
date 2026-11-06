@@ -21,21 +21,21 @@
   ],
   "firmware": [
     {
-      "name": "REVIVER v18",
-      "patch_version": 18,
-      "notes": "GIF screen: store an animation on the keyboard and it plays by itself, even with the PC off (replaces the Monitor screen; upload from the GIF screen tab). v18: the screen button skips KPM and clock in both directions and never skips the GIF screen. Also: recovery from a stuck GIF screen, player state for troubleshooting, safe flash-chip access, live drawing for packages, tear-free scrolling, Yuniverse boot logo, blank Custom Text screen for Now Playing, screen-off support.",
+      "name": "REVIVER v19",
+      "patch_version": 19,
+      "notes": "GIF screen: store an image or animation on the keyboard and it shows by itself, even with the PC off (upload from the GIF screen tab). The screen button now goes Dashboard, Now Playing, GIF screen, typing animation in both directions (KPM, clock and Logo screens skipped). Also: recovery from a stuck GIF screen, safe flash-chip access, live drawing for packages, tear-free scrolling, Yuniverse boot logo, screen-off support.",
       "base": {
         "version": "3.0.7",
         "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
         "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
         "size": 86620
       },
-      "id": "v18",
+      "id": "v19",
       "patch": {
-        "url": "firmware/v18/patch.json",
-        "sha256": "018E4F785F9CC8DEE6D364DAE27672FC47E4AC548E058BF8799813DB65BBCD7D"
+        "url": "firmware/v19/patch.json",
+        "sha256": "D769856CE4075260BC00582B759736C562455A0623FA859F46210DD09AD8D307"
       },
-      "result_sha256": "44179956C0CF4B800BB3DF0754AE5AA25333ADD7831EC31635BEC202BA2ABA50",
+      "result_sha256": "D256B8DE9D728BA66E97753481C487C40B0F7A410930C74FCD1198296369EE3B",
       "result_size": 91584,
       "base_sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56"
     }

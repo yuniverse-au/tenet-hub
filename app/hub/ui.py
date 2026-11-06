@@ -328,16 +328,16 @@ class App:
         nb.add(f, text="GIF screen")
         top = ttk.Frame(f)
         top.pack(fill="x")
-        ttk.Label(top, text="Animation:").pack(side="left")
+        ttk.Label(top, text="Image or GIF:").pack(side="left")
         self.gif_src = tk.StringVar()
         self.gif_combo = ttk.Combobox(top, textvariable=self.gif_src, state="readonly", width=36)
         self.gif_combo.pack(side="left", padx=6)
         self.gif_combo.bind("<<ComboboxSelected>>", lambda e: self._gif_source_changed())
-        ttk.Button(top, text="Open a GIF...", command=self.gif_open).pack(side="left")
+        ttk.Button(top, text="Open an image or GIF...", command=self.gif_open).pack(side="left")
         ttk.Button(top, text="Save as a package...", command=self.gif_save_package).pack(side="left", padx=6)
         self.gif_view = tk.Label(f, background="black")
         self.gif_view.pack(pady=8)
-        self.gif_info = tk.StringVar(value="Pick an animation or open a GIF.")
+        self.gif_info = tk.StringVar(value="Open an image or a GIF (or pick one of your animation packages).")
         ttk.Label(f, textvariable=self.gif_info).pack(anchor="w")
         grid = ttk.Frame(f)
         grid.pack(fill="x", pady=6)
@@ -430,7 +430,8 @@ class App:
         self._gif_changed()
 
     def gif_open(self):
-        p = filedialog.askopenfilename(title="Choose a GIF", filetypes=[("Animations", "*.gif *.webp *.png *.apng"), ("All files", "*.*")])
+        p = filedialog.askopenfilename(title="Choose an image or GIF", filetypes=[
+            ("Images and GIFs", "*.gif *.png *.apng *.webp *.jpg *.jpeg *.bmp *.tif *.tiff"), ("All files", "*.*")])
         if not p:
             return
         files = [x for x in self.cfg.get("gif_files", []) if x != p] + [p]
@@ -473,7 +474,10 @@ class App:
             room = f"uses {len(frames)} of the keyboard's {cap} frames" if cap else \
                 f"{len(frames)} frames"
             warn = "  - too many: lower the frame-rate cap or trim it" if cap and len(frames) > cap else ""
-            self.gif_info.set(f"{len(frames)} frames, {secs:.1f} s loop, {room}{warn}")
+            if len(frames) == 1:
+                self.gif_info.set(f"Still image (1 frame){', ' + room if cap else ''}")
+            else:
+                self.gif_info.set(f"{len(frames)} frames, {secs:.1f} s loop, {room}{warn}")
             self._gif_play(0)
         self._thread(lambda: gif.convert(path, s), done)
 
@@ -537,7 +541,7 @@ class App:
                 messagebox.showerror(APP_NAME, str(err))
             else:
                 self.gif_kbinfo = inf
-                self.gif_msg.set(f"Stored {inf['frames']} frames. It plays on the GIF screen, even with the PC off.")
+                self.gif_msg.set(f"Stored {inf['frames']} frame{'s' if inf['frames'] != 1 else ''}. It shows on the GIF screen, even with the PC off.")
         self._with_keyboard(fn, done)
 
     def gif_show(self):
@@ -573,7 +577,7 @@ class App:
         ext = os.path.splitext(ref)[1].lower() or ".gif"
         shutil.copy(ref, os.path.join(folder, "animation" + ext))
         json.dump({"id": pid, "name": name, "version": "1.0.0", "type": "animation",
-                   "file": "animation" + ext, "description": "A local animation for the GIF screen.",
+                   "file": "animation" + ext, "description": "A local image or animation for the GIF screen.",
                    "gif_settings": self.gif_settings()},
                   open(os.path.join(folder, "package.json"), "w", encoding="utf-8"), indent=2)
         self.reg.scan()

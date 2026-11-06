@@ -116,7 +116,7 @@ def convert(source, settings=None):
             picked.append([i, step])
         t += step
     if len(frames) == 1:
-        picked = [[0, max(step, frames[0][1])]]
+        picked = [[0, 1000]]          # still image: the keyboard only re-checks it once a second
     cache, out = {}, []
     for idx, ms in picked:
         if idx not in cache:

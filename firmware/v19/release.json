@@ -1,0 +1,11 @@
+{
+  "name": "REVIVER v19",
+  "patch_version": 19,
+  "notes": "GIF screen: store an image or animation on the keyboard and it shows by itself, even with the PC off (upload from the GIF screen tab). The screen button now goes Dashboard, Now Playing, GIF screen, typing animation in both directions (KPM, clock and Logo screens skipped). Also: recovery from a stuck GIF screen, safe flash-chip access, live drawing for packages, tear-free scrolling, Yuniverse boot logo, screen-off support.",
+  "base": {
+    "version": "3.0.7",
+    "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
+    "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
+    "size": 86620
+  }
+}

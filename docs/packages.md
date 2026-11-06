@@ -3,7 +3,7 @@
 A package is a folder with a `package.json` and a Python file. Put the folder in `packages/` in this repository and run `python tools/build_index.py`. To try it locally first, copy the folder into `%LOCALAPPDATA%\TenetHub\packages\` and restart TENET Hub.
 
 ## Screen package
-Draws on one of the keyboard's screens: the *Logo* screen or the *Custom Text* screen. The user picks which in the package's settings.
+Draws on the keyboard's *Custom Text* screen (one screen package at a time).
 
 `package.json`
 ```json
@@ -14,7 +14,7 @@ Draws on one of the keyboard's screens: the *Logo* screen or the *Custom Text* s
   "type": "screen",
   "description": "Says hello.",
   "author": "you",
-  "default_mode": 4,
+  "default_mode": 5,
   "requires_firmware": 6,
   "settings": [
     {"key": "text", "type": "str", "default": "Hello!", "label": "Text to show"}

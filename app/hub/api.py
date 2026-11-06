@@ -12,7 +12,7 @@ package.json:
   "description": "...",
   "author": "...",
   "entry": "main.py",                 # optional
-  "default_mode": 5,                  # screen packages: which keyboard screen they draw on
+  "default_mode": 5,                  # screen packages: which keyboard screen they draw on (5)
   "requires_firmware": 13,            # minimum REVIVER version (0 = official is fine)
   "requires_hub": "1.0.0",            # optional
   "settings": [                       # optional; shown in the app's package settings dialog
@@ -28,9 +28,10 @@ shows 16 levels). Only the parts that change are sent to the keyboard.
 """
 WIDTH, HEIGHT = 256, 32
 
-# Keyboard screens a package can take over. The firmware draws something static there (the stored
-# logo in 4; nothing in 5 with REVIVER v12+), so a package's drawing isn't overwritten.
-PACKAGE_MODES = {4: "Logo screen", 5: "Custom Text screen"}
+# Keyboard screens a package can take over. The firmware draws nothing there (REVIVER v12+), so a
+# package's drawing isn't overwritten. (The Logo screen was removed in v19: still images go on the
+# GIF screen now.)
+PACKAGE_MODES = {5: "Custom Text screen"}
 
 
 class Context:

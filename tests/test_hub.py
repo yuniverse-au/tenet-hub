@@ -48,7 +48,7 @@ reg = Registry(cfg, log)
 # --- catalogue -----------------------------------------------------------------------------------
 new, upd = reg.refresh()
 check(f"catalogue fetched: new={new} updates={upd} firmware={[f['id'] for f in reg.firmware_releases()]}",
-      new == ["nowplaying"] and upd == [] and reg.firmware_releases()[0]["patch_version"] == 18)
+      new == ["nowplaying"] and upd == [] and reg.firmware_releases()[0]["patch_version"] == 19)
 m = reg.install("nowplaying")
 check(f"installed {m['id']} {m['version']}; no longer 'new'", "nowplaying" in reg.installed and reg.new_ids() == [])
 
@@ -66,7 +66,7 @@ check(f"updated to {reg.installed['nowplaying']['version']}", reg.installed["now
 
 # a brand-new package appears
 os.makedirs(os.path.join(REPO, "packages", "hello"))
-json.dump({"id": "hello", "name": "Hello", "version": "0.1.0", "type": "screen", "default_mode": 4,
+json.dump({"id": "hello", "name": "Hello", "version": "0.1.0", "type": "screen", "default_mode": 5,
            "requires_firmware": 1, "description": "test"}, open(os.path.join(REPO, "packages", "hello", "package.json"), "w"))
 open(os.path.join(REPO, "packages", "hello", "main.py"), "w").write(
     "from hub import api\nfrom PIL import Image, ImageDraw\n"
@@ -109,7 +109,7 @@ except ValueError as e:
 rel = reg.firmware_releases()[0]
 rel = dict(rel, base=dict(rel["base"], url=firmware.OFFICIAL_307["url"]))   # local copy instead of Hexcore
 img = firmware.build(rel, INDEX)
-check(f"v18 rebuilt from official + patch, sha {firmware.sha256(img)[:16]}", img == open(PATCHED, "rb").read())
+check(f"v19 rebuilt from official + patch, sha {firmware.sha256(img)[:16]}", img == open(PATCHED, "rb").read())
 bad = dict(rel, patch=dict(rel["patch"], sha256="00" * 32))
 try:
     firmware.build(bad, INDEX)
@@ -121,7 +121,7 @@ B = fake_hid.BOARD
 B.patch, B.state = 0, "app"            # official firmware on the keyboard
 steps = []
 flasher.flash(img, {rel["result_sha256"]}, lambda f, msg: steps.append(msg))
-check(f"flashed: {len(B.flash)} bytes match v18, back in normal mode, no pipelined packets",
+check(f"flashed: {len(B.flash)} bytes match v19, back in normal mode, no pipelined packets",
       bytes(B.flash[:len(img)]) == img and B.state == "app" and B.violations == 0)
 try:
     flasher.flash(img + b"x", {rel["result_sha256"]})
@@ -130,26 +130,32 @@ except flasher.FlashError:
     check("unknown image refused before touching the keyboard", True)
 
 # --- host: packages drawing on the keyboard -----------------------------------------------------
-B.patch, B.state, B.mode, B.cmds, B.oled_log = 18, "app", 4, [], []
+B.patch, B.state, B.mode, B.cmds, B.oled_log = 19, "app", 5, [], []
 cfg.pkg("hello")["enabled"] = True
-cfg.pkg("nowplaying")["enabled"] = True
+cfg.pkg("nowplaying")["enabled"] = False
 cfg.data["burn_in_shift"] = False
 cfg.save()
 reg.install("hello")
 host = Host(cfg, reg, log)
 host._tick()
 check(f"connected: {host.fw}; running {sorted(host.running)}; problems {host.problems}",
-      str(host.fw) == "REVIVER v18" and sorted(host.running) == ["hello", "nowplaying"])
+      str(host.fw) == "REVIVER v19" and sorted(host.running) == ["hello"])
 for _ in range(10):
     host._tick()
 ref = Image.new("L", (256, 32), 0)
 __import__("PIL.ImageDraw", fromlist=["Draw"]).Draw(ref).rectangle((0, 0, 63, 31), fill=255)
-check("mode 4: 'hello' package drawn on the keyboard", bytes(B.screen) == screen.to_4bpp(ref))
+check("screen 5: 'hello' package drawn on the keyboard", bytes(B.screen) == screen.to_4bpp(ref))
 n = len(B.cmds)
 for _ in range(5):
     host._tick()
 check(f"unchanged frames send nothing ({len(B.cmds) - n} packets, all mode reads)",
       all(c == "7012" for c in B.cmds[n:]))
+cfg.pkg("nowplaying")["enabled"] = True
+cfg.save(); host._tick()
+check(f"two screen packages on screen 5: second one waits ({host.problems})",
+      any("used by" in v for v in host.problems.values()))
+cfg.pkg("hello")["enabled"] = False
+cfg.save(); host.reload()
 B.mode = 5
 for _ in range(15):
     host._tick()
@@ -170,7 +176,7 @@ for _ in range(3):
     host._tick()
 check(f"PC asleep: screen off ({B.oled_log[-1]}) and nothing drawn", B.oled_log[-1] == "ae" and len(B.cmds) == n)
 host._wake()
-B.mode = 4
+B.mode = 5
 host._tick(); host._tick()
 check(f"woke: screen back on ({B.oled_log[-2:]}) and redrawn", "af" in B.oled_log[-3:])
 B.state = "gone"
@@ -181,7 +187,7 @@ except Exception:
 check("unplugged: host notices", host.kb is None)
 B.state = "app"
 host._tick()
-check("replugged: reconnects", host.kb is not None and str(host.fw) == "REVIVER v18")
+check("replugged: reconnects", host.kb is not None and str(host.fw) == "REVIVER v19")
 B.patch = 4
 host._disconnect("x"); host._tick()
 check(f"older patch on the keyboard: problems {host.problems}",
@@ -191,7 +197,7 @@ check(f"older patch on the keyboard: problems {host.problems}",
 import zlib
 from hub import gif
 from hub.device import Keyboard
-B.patch, B.state = 18, "app"
+B.patch, B.state = 19, "app"
 host._disconnect("x")
 src = [Image.new("RGB", (64, 16), (k * 40, k * 40, k * 40)) for k in range(6)]
 buf = io.BytesIO()
@@ -208,6 +214,9 @@ fr4 = gif.convert(buf.getvalue(), {"fps_cap": 30, "trim_start": 2, "trim_end": 1
 check(f"trim 2 at the start and 1 at the end: {len(fr4)} frames", len(fr4) == 3)
 fr5 = gif.convert(buf.getvalue(), {"fps_cap": 30, "brightness": 100})
 check("brightness +100 saturates", all(i.getextrema()[0] == 255 for i, _ in fr5))
+still = io.BytesIO(); Image.new("RGB", (300, 60), (200, 200, 200)).save(still, "JPEG")
+fr6 = gif.convert(still.getvalue(), {})
+check(f"a still JPEG becomes one frame: {len(fr6)} frame, size {fr6[0][0].size}", len(fr6) == 1 and fr6[0][0].size == (256, 32))
 kind, path = fake_hid.enumerate()[1]["usage_page"], b"vendor"
 kb = Keyboard(b"vendor")
 inf = gif.info(kb)
