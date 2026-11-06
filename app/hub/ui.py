@@ -369,28 +369,33 @@ class App:
         box.pack(fill="x", pady=(8, 0))
         src = pcstats.sources(self.cfg)
         labels = [v[0] for v in pcstats.SOURCES.values()]
-        self.stat_vars, self.stat_now = {}, {}
+        self.stat_vars, self.stat_now, self.stat_label = {}, {}, {}
+        names = pcstats.labels(self.cfg)
         for i, s in enumerate(pcstats.SLOTS):
             ttk.Label(box, text=pcstats.SLOT_NAMES[s]).grid(row=i, column=0, sticky="w", padx=(0, 8))
             v = tk.StringVar(value=pcstats.SOURCES[src[s]][0])
             cb = ttk.Combobox(box, textvariable=v, values=labels, state="readonly", width=24)
             cb.grid(row=i, column=1, sticky="w", pady=1)
             cb.bind("<<ComboboxSelected>>", lambda e: self._stats_sources_changed())
+            lab = tk.StringVar(value=f"label {names[s]}")
+            ttk.Label(box, textvariable=lab, width=11).grid(row=i, column=2, sticky="w", padx=(10, 0))
             now = tk.StringVar(value="")
-            ttk.Label(box, textvariable=now, foreground="#555").grid(row=i, column=2, sticky="w", padx=10)
-            self.stat_vars[s], self.stat_now[s] = v, now
+            ttk.Label(box, textvariable=now, foreground="#555").grid(row=i, column=3, sticky="w", padx=10)
+            self.stat_vars[s], self.stat_now[s], self.stat_label[s] = v, now, lab
         ttk.Label(box, text="Temperatures come from LibreHardwareMonitor (run it as administrator and turn on "
                             "Options > Remote Web Server) or, for NVIDIA graphics cards, the NVIDIA driver. "
-                            "Usage and memory come from Windows. The keyboard shows 0-99. The CPU / GPU / DISK "
-                            "labels on the keyboard are drawn by its firmware and stay the same whatever you "
-                            "pick here.",
-                  foreground="#555", wraplength=800, justify="left").grid(row=3, column=0, columnspan=3, sticky="w", pady=(6, 0))
+                            "Usage and memory come from Windows. The keyboard shows 0-99. The label under each "
+                            f"number follows what it measures on REVIVER v{pcstats.LABELS_PATCH} or newer "
+                            "(older firmware always shows CPU / GPU / DISK).",
+                  foreground="#555", wraplength=800, justify="left").grid(row=3, column=0, columnspan=4, sticky="w", pady=(6, 0))
 
     def _stats_sources_changed(self):
         rev = {v[0]: k for k, v in pcstats.SOURCES.items()}
         self.cfg.set("stats_sources", {s: rev[v.get()] for s, v in self.stat_vars.items()})
+        names = pcstats.labels(self.cfg)
         for s in pcstats.SLOTS:
             self.stat_now[s].set("")
+            self.stat_label[s].set(f"label {names[s]}")
 
     def _stats_live(self):
         if not hasattr(self, "stat_now"):

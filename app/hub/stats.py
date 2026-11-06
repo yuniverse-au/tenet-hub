@@ -35,6 +35,10 @@ SOURCES = {
     "disk_temp": ("Disk temperature (°C)", "disk", "temp"),
 }
 DEFAULT_SOURCES = {"cpu": "cpu_usage", "gpu": "gpu_temp", "disk": "disk_usage"}
+# The keyboard's label under each number (REVIVER v25+, 70 24). The left and middle boxes fit 3
+# characters, the right one 4; the stock pictures say CPU / GPU / DISK.
+LABELS_PATCH = 25
+LABELS = {"cpu": ("CPU", "CPU"), "gpu": ("GPU", "GPU"), "mem": ("RAM", "RAM"), "disk": ("DSK", "DISK")}
 DEFAULT_KINDS = {s: SOURCES[v][2] for s, v in DEFAULT_SOURCES.items()}
 LHM_URL = "http://localhost:8085/data.json"
 
@@ -55,6 +59,16 @@ def sources(cfg):
 def kinds(cfg):
     """slot -> "usage" | "temp"."""
     return {s: SOURCES[v][2] for s, v in sources(cfg).items()}
+
+
+def labels(cfg):
+    """slot -> the text the keyboard shows under that number."""
+    return {s: LABELS[SOURCES[v][1]][1 if s == "disk" else 0] for s, v in sources(cfg).items()}
+
+
+def label_payload(slot, text):
+    """70 24 argument: slot index, then 4 characters (0-padded)."""
+    return bytes([SLOTS.index(slot)]) + text.upper().encode("ascii", "replace")[:4].ljust(4, b"\0")
 
 
 def units_bits(k):

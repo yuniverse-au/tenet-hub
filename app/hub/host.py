@@ -50,7 +50,7 @@ class Host:
         self._sent_list, self._sent_at = None, 0.0
         self._clock_at, self._clock_fmt = 0.0, None   # last clock sync; 12h flag sent this connection
         self.stats = pcstats.Sampler(cfg, log)           # PC stats screen (v24)
-        self._units_sent, self._stats_at = None, 0.0
+        self._units_sent, self._stats_at, self._labels_sent = None, 0.0, {}
         self.running = {}                 # id -> Running
         self.problems = {}                # id -> why it isn't running
         self.paused = threading.Event()   # set while flashing: the host lets go of the keyboard
@@ -226,7 +226,7 @@ class Host:
         self.kb, self.fw = kb, fw
         self._sent_list, self._sent_at = None, 0.0
         self._clock_at, self._clock_fmt = 0.0, None   # last clock sync; 12h flag sent this connection
-        self._units_sent, self._stats_at = None, 0.0
+        self._units_sent, self._stats_at, self._labels_sent = None, 0.0, {}
         self.screen = Screen(kb, fw, self.cfg["contrast"]) if fw.at_least(1) else None
         if self.screen:
             self.screen.hold_off = self.asleep
@@ -251,6 +251,12 @@ class Host:
             r = self.kb.cmd(0x23, bytes([units]))
             if r is not None and r[:1] == b"\x00":
                 self._units_sent = units
+        if self.fw is not None and self.fw.at_least(pcstats.LABELS_PATCH):
+            for slot, text in pcstats.labels(self.cfg).items():   # the labels (v25+, RAM only too)
+                if self._labels_sent.get(slot) != text:
+                    r = self.kb.cmd(0x24, pcstats.label_payload(slot, text))
+                    if r is not None and r[:1] == b"\x00":
+                        self._labels_sent[slot] = text
         if current == screenlist.STATS and time.time() - self._stats_at >= 1.0:
             self._stats_at = time.time()
             self.kb.cmd(0x09, self.stats.values())       # stock 70 09: CPU, GPU, DISK (0-99)

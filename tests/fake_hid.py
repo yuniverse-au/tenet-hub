@@ -27,6 +27,7 @@ class Board:
         self.stats_units = None          # v24 70 23
         self.stats_values = None         # stock 70 09
         self.stats_on = False            # mode 6 shows PC stats
+        self.stats_labels = [b""] * 3    # v25 70 24 (b"" = the stock picture)
         self.time = None                 # 70 07 args (month, day, weekday, h, m, s)
         self.clock_12h = None
         self.settings_writes = 0
@@ -129,6 +130,11 @@ class Board:
                 return R(cmd, b"\x00")
             if cmd == b"\x70\x23" and self.patch >= 24:
                 self.stats_units = args[0]
+                return R(cmd, b"\x00")
+            if cmd == b"\x70\x24" and self.patch >= 25:
+                if args[0] > 2:
+                    return R(cmd, b"\x01")
+                self.stats_labels[args[0]] = bytes(args[1:5]).split(b"\0")[0]
                 return R(cmd, b"\x00")
             if cmd == b"\x70\x07" and len(args) == 6:          # stock: set the clock (any firmware)
                 self.time = tuple(args)

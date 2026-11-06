@@ -55,14 +55,14 @@ check(f"installed {m['id']} {m['version']}; no longer 'new'", "nowplaying" in re
 # an update appears in the catalogue
 pj = os.path.join(REPO, "packages", "nowplaying", "package.json")
 d = json.load(open(pj))
-d["version"] = "1.0.1"
+d["version"] = "99.0.0"
 d["changelog"] = "test update"
 json.dump(d, open(pj, "w"))
 os.system(f"cd {REPO} && {sys.executable} tools/build_index.py >/dev/null")
 new, upd = reg.refresh()
 check(f"update detected: {upd}", upd == ["nowplaying"])
 reg.install("nowplaying")
-check(f"updated to {reg.installed['nowplaying']['version']}", reg.installed["nowplaying"]["version"] == "1.0.1")
+check(f"updated to {reg.installed['nowplaying']['version']}", reg.installed["nowplaying"]["version"] == "99.0.0")
 
 # a brand-new package appears
 os.makedirs(os.path.join(REPO, "packages", "hello"))
@@ -214,6 +214,11 @@ cfg.data["stats_sources"] = {"cpu": "mem_usage", "gpu": "cpu_temp", "disk": "bog
 check("stats_sources: memory in the left slot, unknown ids fall back",
       pcstats.sources(cfg) == {"cpu": "mem_usage", "gpu": "cpu_temp", "disk": "disk_usage"}
       and pcstats.units_bits(pcstats.kinds(cfg)) == 0b101)
+check("labels follow the sources (right box fits DISK)",
+      pcstats.labels(cfg) == {"cpu": "RAM", "gpu": "CPU", "disk": "DISK"})
+cfg.data["stats_sources"] = {"cpu": "disk_temp", "gpu": "gpu_usage", "disk": "mem_usage"}
+check("disk in a 3-character box is DSK", pcstats.labels(cfg) == {"cpu": "DSK", "gpu": "GPU", "disk": "RAM"})
+check("70 24 payload", pcstats.label_payload("disk", "RAM") == bytes([2]) + b"RAM\0")
 cfg.data.pop("stats_sources"); cfg.data.pop("stats_kinds")
 check("values clamp to 0-99", [pcstats.to_byte(v) for v in (None, -3, 42.6, 100, 250)] == [0, 0, 43, 99, 99])
 smp = pcstats.Sampler(cfg, log)
@@ -286,6 +291,12 @@ cfg.set("stats_kinds", {"cpu": "temp", "gpu": "temp", "disk": "temp"}); host._ti
 check("changing a slot to temperature updates the units", B.stats_units == 0)
 cfg.set("stats_sources", {"cpu": "mem_usage", "gpu": "gpu_temp", "disk": "disk_temp"}); host._tick()
 check("memory usage in a slot shows %", B.stats_units == 0b001)
+check("v24 keyboard: no labels sent", B.stats_labels == [b""] * 3 and "7024" not in B.cmds)
+B.patch = 25; host.fw = type(host.fw)("patch", 25, True); host._tick()
+check(f"v25 keyboard: labels sent {B.stats_labels}", B.stats_labels == [b"RAM", b"GPU", b"DISK"])
+n = B.cmds.count("7024"); host._tick()
+check("labels only resent when they change", B.cmds.count("7024") == n)
+B.patch = 24; host.fw = type(host.fw)("patch", 24, True)
 cfg.data.pop("stats_sources")
 B.press(); B.stats_values = None; host._stats_at = 0; host._tick()
 check("off the PC stats screen: no values sent", B.mode == 7 and B.stats_values is None)
