@@ -3,7 +3,7 @@
 A package is a folder with a `package.json` and a Python file. Put the folder in `packages/` in this repository and run `python tools/build_index.py`. To try it locally first, copy the folder into `%LOCALAPPDATA%\TenetHub\packages\` and restart TENET Hub.
 
 ## Screen package
-Draws on the keyboard's *Custom Text* screen (one screen package at a time).
+Gets a screen of its own on the keyboard (REVIVER v21+; the user places it in the **Screens** tab). On older firmware it draws on the *Custom Text* screen, one screen package at a time. `ctx.show()` brings the package's screen up (for example when music starts).
 
 `package.json`
 ```json

@@ -9,7 +9,7 @@ import ctypes, os, sys, threading, time, traceback
 
 from PIL import Image
 
-from . import api, power
+from . import screens as screenlist, api, power
 from .config import data_dir
 from .device import Keyboard, enumerate_keyboards
 from .screen import Screen
@@ -46,6 +46,8 @@ class Host:
         self.kb = self.fw = self.screen = None
         self.status = "Starting..."
         self.mode = None
+        self.slots, self.want = {}, None             # v21: package id -> screen code; list to keep
+        self._sent_list = None
         self.running = {}                 # id -> Running
         self.problems = {}                # id -> why it isn't running
         self.paused = threading.Event()   # set while flashing: the host lets go of the keyboard
@@ -105,12 +107,17 @@ class Host:
         self._event("wake")
 
     # --- packages ---------------------------------------------------------------------------
+    def _v21(self):
+        return self.fw is not None and self.fw.at_least(screenlist.MIN_PATCH)
+
     def _mode_for(self, m):
+        if self.fw is None or self._v21():
+            return 5                                 # v21: every screen package has a screen of its own
         mode = self.cfg.pkg(m["id"]).get("mode") or m.get("default_mode")
         return mode if mode in api.PACKAGE_MODES else None
 
-    def _request(self, kind, value):
-        self._requests.append((kind, value))
+    def _request(self, kind, value, pid=None):
+        self._requests.append((kind, value, pid))
         return True
 
     def _start_pkg(self, m):
@@ -130,7 +137,8 @@ class Host:
             settings = dict(m.defaults())
             settings.update(self.cfg.pkg(pid).get("settings") or {})
             ctx = api.Context(pid, settings, data_dir("package-data", pid),
-                              lambda *a, pid=pid: self.log(f"[{pid}]", *a), self.fw, self._request)
+                              lambda *a, pid=pid: self.log(f"[{pid}]", *a), self.fw,
+                              lambda kind, value, pid=pid: self._request(kind, value, pid))
             ctx.screen_mode = self._mode_for(m) if m["type"] == "screen" else None
             obj.start(ctx)
             self.running[pid] = Running(m, obj, ctx)
@@ -156,7 +164,7 @@ class Host:
                 self._stop_pkg(pid)
         claimed = {}
         for pid, m in wanted.items():
-            if m["type"] == "screen":
+            if m["type"] == "screen" and not self._v21() and self.fw is not None:
                 mode = self._mode_for(m)
                 if mode in claimed and claimed[mode] != pid:
                     self.problems[pid] = f"{api.PACKAGE_MODES[mode]} is used by {claimed[mode]}"
@@ -168,6 +176,7 @@ class Host:
         for pid in list(self.problems):
             if pid not in wanted:
                 self.problems.pop(pid)
+        self.want, self.slots = screenlist.keyboard_list(screenlist.entries(self.cfg, self.reg))
 
     def _fail(self, r, e):
         r.errors += 1
@@ -205,6 +214,7 @@ class Host:
         kb = Keyboard(path)
         fw = kb.probe()
         self.kb, self.fw = kb, fw
+        self._sent_list = None
         self.screen = Screen(kb, fw, self.cfg["contrast"]) if fw.at_least(1) else None
         if self.screen:
             self.screen.hold_off = self.asleep
@@ -243,15 +253,33 @@ class Host:
                 self._sync_packages()
                 return 2.0
             self._sync_packages()
+            v21 = self._v21()
             while self._requests:
-                kind, value = self._requests.pop(0)
-                if kind == "mode" and self.fw.at_least(15) and value in range(1, 8):   # v15: safe from the app
-                    self.kb.set_mode(value)
+                kind, value, pid = self._requests.pop(0)
+                if v21 and kind == "mode" and value == 5 and pid in self.slots:
+                    self.kb.show_screen(self.slots[pid])           # a package asking for its own screen
+                elif v21 and kind == "show" and value is not None:
+                    self.kb.show_screen(value)
+                elif kind == "mode" and self.fw.at_least(15) and value in range(1, 8):   # v15: safe from the app
+                    if v21 and value != 5:
+                        self.kb.show_screen(value)
+                    elif not v21:
+                        self.kb.set_mode(value)
+            if v21:
+                st = self.kb.screens(heartbeat=True)               # also keeps package screens in the cycle
+                if st is None:
+                    raise IOError("no reply")
+                _, mode, _, on_kb = st                             # mode = screen code (0x80+k = package)
+                if self.want and on_kb != self.want and self._sent_list != self.want:
+                    self._sent_list = list(self.want)
+                    if self.kb.set_screens(self.want):
+                        self.log("screen list sent:", [hex(x) for x in self.want])
             if self.asleep or self.screen is None:
                 return 0.5
-            mode = self.kb.mode() if self.fw.at_least(6) else None
-            if mode is None and self.fw.at_least(6):
-                raise IOError("no reply")
+            if not v21:
+                mode = self.kb.mode() if self.fw.at_least(6) else None
+                if mode is None and self.fw.at_least(6):
+                    raise IOError("no reply")
             if mode != self.mode:
                 self.mode = mode
                 self.screen.forget()
@@ -259,7 +287,7 @@ class Host:
             active = None
             for r in self.running.values():
                 if r.m["type"] == "screen":
-                    show = self._mode_for(r.m) == mode
+                    show = (self.slots.get(r.m["id"]) == mode) if v21 else self._mode_for(r.m) == mode
                     if show != r.shown:
                         r.shown = show
                         try:

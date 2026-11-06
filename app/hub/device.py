@@ -98,6 +98,22 @@ class Keyboard:
         r = self.cmd(0x12)
         return r[1] if r and len(r) >= 2 and r[0] == 0 else None
 
+    def screens(self, heartbeat=True):
+        """REVIVER v21: -> (mode, current screen code, hub alive, [list]) or None. With heartbeat,
+        also tells the keyboard TENET Hub is running (package screens stay in the cycle 5 s)."""
+        r = self.cmd(0x20 if heartbeat else 0x1F)
+        if not r or r[0] != 0 or len(r) < 5 or len(r) < 5 + r[4]:
+            return None
+        return r[1], r[2], bool(r[3]), list(r[5:5 + r[4]])
+
+    def set_screens(self, codes):
+        r = self.cmd(0x21, bytes([len(codes)] + list(codes)), timeout=3000)
+        return r is not None and r[:1] == b"\x00"
+
+    def show_screen(self, code):
+        r = self.cmd(0x22, bytes([code]))
+        return r is not None and r[:1] == b"\x00"
+
     def set_mode(self, m):
         return self.cmd(0x13, bytes([m])) == b"\x00"
 

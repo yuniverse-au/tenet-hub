@@ -48,7 +48,7 @@ reg = Registry(cfg, log)
 # --- catalogue -----------------------------------------------------------------------------------
 new, upd = reg.refresh()
 check(f"catalogue fetched: new={new} updates={upd} firmware={[f['id'] for f in reg.firmware_releases()]}",
-      new == ["nowplaying"] and upd == [] and reg.firmware_releases()[0]["patch_version"] == 20)
+      new == ["nowplaying"] and upd == [] and reg.firmware_releases()[0]["patch_version"] == 21)
 m = reg.install("nowplaying")
 check(f"installed {m['id']} {m['version']}; no longer 'new'", "nowplaying" in reg.installed and reg.new_ids() == [])
 
@@ -109,7 +109,7 @@ except ValueError as e:
 rel = reg.firmware_releases()[0]
 rel = dict(rel, base=dict(rel["base"], url=firmware.OFFICIAL_307["url"]))   # local copy instead of Hexcore
 img = firmware.build(rel, INDEX)
-check(f"v20 rebuilt from official + patch, sha {firmware.sha256(img)[:16]}", img == open(PATCHED, "rb").read())
+check(f"v21 rebuilt from official + patch, sha {firmware.sha256(img)[:16]}", img == open(PATCHED, "rb").read())
 bad = dict(rel, patch=dict(rel["patch"], sha256="00" * 32))
 try:
     firmware.build(bad, INDEX)
@@ -121,7 +121,7 @@ B = fake_hid.BOARD
 B.patch, B.state = 0, "app"            # official firmware on the keyboard
 steps = []
 flasher.flash(img, {rel["result_sha256"]}, lambda f, msg: steps.append(msg))
-check(f"flashed: {len(B.flash)} bytes match v20, back in normal mode, no pipelined packets",
+check(f"flashed: {len(B.flash)} bytes match v21, back in normal mode, no pipelined packets",
       bytes(B.flash[:len(img)]) == img and B.state == "app" and B.violations == 0)
 try:
     flasher.flash(img + b"x", {rel["result_sha256"]})
@@ -192,6 +192,62 @@ B.patch = 4
 host._disconnect("x"); host._tick()
 check(f"older patch on the keyboard: problems {host.problems}",
       "Needs REVIVER v6" in host.problems.get("nowplaying", "") and "hello" not in host.problems)
+
+# --- v21: screen list, every screen package on a screen of its own ----------------------------
+from hub import screens as screenlist
+B.patch, B.mode, B.scr, B.hub_alive, B.list_writes = 21, 1, [1, 0x80, 6, 7], False, 0
+cfg.pkg("hello")["enabled"] = True
+cfg.pkg("nowplaying")["enabled"] = True
+cfg.set("screens", [])
+cfg.save()
+host._disconnect("x"); host.reload()
+for _ in range(3):
+    host._tick()
+items = screenlist.entries(cfg, reg)
+check(f"default order: {[e['id'] for e in items]}",
+      [e["id"] for e in items] == ["stock:1", "pkg:hello", "pkg:nowplaying", "stock:2", "stock:3", "stock:4", "stock:6", "stock:7"]
+      and [e["on"] for e in items] == [True, True, True, False, False, False, True, True])
+check(f"both screen packages run, no conflicts ({sorted(host.running)}, {host.problems})",
+      sorted(host.running) == ["hello", "nowplaying"] and not host.problems)
+check(f"list sent to the keyboard once: {[hex(x) for x in B.scr]} ({B.list_writes} write)",
+      B.scr == [1, 0x80, 0x81, 6, 7] and B.list_writes == 1 and B.hub_alive)
+for _ in range(3):
+    host._tick()
+check("not rewritten while it matches", B.list_writes == 1)
+B.press()
+for _ in range(4):
+    host._tick()
+check(f"button -> hello's screen ({B.mode}, slot {B.slot}); hello drawn", B.mode == 5 and B.slot == 0
+      and bytes(B.screen) == screen.to_4bpp(ref) and host.running["hello"].shown and not host.running["nowplaying"].shown)
+B.press()
+for _ in range(15):
+    host._tick(); time.sleep(0.05)
+np_img = host.running["nowplaying"].obj.frame(time.time())
+check("button -> Now Playing's own screen, drawn", B.slot == 1 and host.running["nowplaying"].shown
+      and not host.running["hello"].shown and bytes(B.screen)[:16 * 128] == screen.to_4bpp(np_img)[:16 * 128])
+B.press(); check("button -> image screen", B.mode == 6)
+host.running["hello"].ctx.request_mode(5); host._tick()
+check(f"a package asking for its screen gets its own one ({B.mode}, slot {B.slot})", B.mode == 5 and B.slot == 0)
+host._request("show", 3); host._tick()
+check("Screens tab 'Show it now' works", B.mode == 3)
+items = screenlist.entries(cfg, reg)
+ids = [e["id"] for e in items]
+items.insert(0, items.pop(ids.index("pkg:nowplaying")))
+next(e for e in items if e["id"] == "stock:3")["on"] = True
+next(e for e in items if e["id"] == "stock:7")["on"] = False
+screenlist.save(cfg, items)
+host._tick()
+check(f"reordered + clock on + typing off: {[hex(x) for x in B.scr]}", B.scr == [0x80, 1, 0x81, 3, 6])
+host._tick(); host._tick()
+check("package slots follow the order (Now Playing is 0x80 now)", host.slots == {"nowplaying": 0x80, "hello": 0x81})
+cfg.pkg("hello")["enabled"] = False; cfg.save(); host._tick()
+check(f"package turned off -> its screen leaves the list: {[hex(x) for x in B.scr]}", B.scr == [0x80, 1, 3, 6])
+B.hub_alive = False; B.mode = 1; B.press()
+check("Hub not running: the button skips package screens", B.mode == 3)
+only_pkgs = [{"id": "pkg:nowplaying", "on": True, "name": "", "kind": ""}, {"id": "stock:1", "on": False}]
+check("a list with no built-in screen gets the Dashboard added", screenlist.keyboard_list(only_pkgs)[0] == [1, 0x80])
+cfg.set("screens", []); cfg.pkg("hello")["enabled"] = True; cfg.save()
+check(f"never pipelined ({B.violations})", B.violations == 0)
 
 # --- image screen: convert with adjustments, upload, skip unchanged frames, clear ------------------
 import zlib

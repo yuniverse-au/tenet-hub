@@ -1,0 +1,103 @@
+"""The keyboard's screen list (REVIVER v21+): which screens the screen button goes through, in
+what order. Built-in screens can be turned off; every screen package gets a screen of its own.
+
+The keyboard keeps the list in its flash, so the button works the same with the PC off. Package
+screens are only part of the cycle while TENET Hub is running (it sends a heartbeat); otherwise
+the keyboard skips them, so it never stops on a blank screen.
+
+Settings: cfg["screens"] = [{"id": "stock:1" | "pkg:<package id>", "on": bool}, ...] in button
+order. A package screen is on when the package is enabled (one switch for both).
+"""
+MIN_PATCH = 21
+MAX = 24                      # entries the keyboard holds (6 built-in + up to 18 package screens)
+PKG = 0x80                    # keyboard code of package screen k = 0x80 + k
+
+STOCK = {
+    1: "Dashboard",
+    2: "Keystrokes per minute",
+    3: "Clock",
+    4: "Logo (the image Hexcore Link uploaded)",
+    6: "Image screen",
+    7: "Typing animation",
+}
+DEFAULT_ON = {1, 6, 7}        # what REVIVER v18-v20 showed
+
+
+def _screen_packages(reg):
+    return [pid for pid, m in sorted(reg.installed.items(), key=lambda x: x[1].get("name", x[0]).lower())
+            if m.get("type") == "screen"]
+
+
+def entries(cfg, reg):
+    """The full ordered list: [{"id", "on", "name", "kind"}]. Adds new built-in screens and newly
+    installed screen packages, drops uninstalled packages."""
+    pkgs = _screen_packages(reg)
+    saved = [e for e in (cfg.get("screens") or []) if isinstance(e, dict) and "id" in e]
+    out, seen = [], set()
+    for e in saved:
+        i = e["id"]
+        if i in seen:
+            continue
+        if i.startswith("stock:") and i[6:].isdigit() and int(i[6:]) in STOCK:
+            out.append({"id": i, "on": bool(e.get("on"))})
+        elif i.startswith("pkg:") and i[4:] in pkgs:
+            out.append({"id": i})
+        else:
+            continue
+        seen.add(i)
+    if not out:                                   # first run: the v20 order, packages after Dashboard
+        out = [{"id": f"stock:{k}", "on": k in DEFAULT_ON} for k in STOCK]
+        seen = {e["id"] for e in out}
+    for pid in pkgs:                              # new packages go after the last package screen
+        if f"pkg:{pid}" not in seen:
+            last = max([n for n, e in enumerate(out) if e["id"].startswith("pkg:")] + [0])
+            out.insert(last + 1, {"id": f"pkg:{pid}"})
+    for k in STOCK:
+        if f"stock:{k}" not in seen and not any(e["id"] == f"stock:{k}" for e in out):
+            out.append({"id": f"stock:{k}", "on": False})
+    for e in out:
+        if e["id"].startswith("pkg:"):
+            pid = e["id"][4:]
+            e["on"] = bool(cfg.pkg(pid).get("enabled"))
+            e["name"] = reg.installed[pid].get("name", pid)
+            e["kind"] = "Package"
+        else:
+            e["name"] = STOCK[int(e["id"][6:])]
+            e["kind"] = "Built in"
+    return out
+
+
+def save(cfg, items):
+    """Store the order and the built-in on/off switches (package switches are the packages' own)."""
+    cfg.set("screens", [{"id": e["id"], "on": bool(e["on"])} if e["id"].startswith("stock:") else {"id": e["id"]}
+                        for e in items])
+
+
+def keyboard_list(items):
+    """-> (codes for 70 21, {package id: code}). Always has a built-in screen; at most MAX entries."""
+    codes, slots, k = [], {}, 0
+    for e in items:
+        if not e["on"] or len(codes) >= MAX:
+            continue
+        if e["id"].startswith("stock:"):
+            codes.append(int(e["id"][6:]))
+        elif k < MAX:
+            slots[e["id"][4:]] = PKG + k
+            codes.append(PKG + k)
+            k += 1
+    if not any(c < PKG for c in codes):
+        codes = ([1] + codes)[:MAX]
+    if len(codes) == MAX and not any(c < PKG for c in codes):
+        codes[-1] = 1
+    slots = {p: c for p, c in slots.items() if c in codes}
+    return codes, slots
+
+
+def name_of(code, items):
+    if code < PKG:
+        return STOCK.get(code, f"Screen {code}")
+    _, slots = keyboard_list(items)
+    for e in items:
+        if e["id"].startswith("pkg:") and slots.get(e["id"][4:]) == code:
+            return e["name"]
+    return "Package screen"

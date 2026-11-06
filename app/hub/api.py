@@ -28,9 +28,9 @@ shows 16 levels). Only the parts that change are sent to the keyboard.
 """
 WIDTH, HEIGHT = 256, 32
 
-# Keyboard screens a package can take over. The firmware draws nothing there (REVIVER v12+), so a
-# package's drawing isn't overwritten. (The Logo screen was removed in v19: still images go on the
-# Image screen now.)
+# Keyboard screens a package can take over (before REVIVER v21). From v21 every screen package gets a
+# screen of its own in the keyboard's screen list (Screens tab), so this only matters on older
+# firmware. The firmware draws nothing on mode 5 (REVIVER v12+), so a package's drawing stays.
 PACKAGE_MODES = {5: "Custom Text screen"}
 
 
@@ -48,6 +48,10 @@ class Context:
     def request_mode(self, mode):
         """Ask the keyboard to switch to a screen (e.g. when music starts). Returns True if sent."""
         return self._request("mode", mode)
+
+    def show(self):
+        """Bring this package's own screen up on the keyboard (e.g. when music starts)."""
+        return self._request("mode", 5)
 
 
 class ScreenPackage:

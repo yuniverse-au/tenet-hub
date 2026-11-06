@@ -6,7 +6,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageDraw
 
-from . import APP_NAME, VERSION, api, bootlogo, firmware, flasher, gif
+from . import APP_NAME, VERSION, api, bootlogo, firmware, flasher, gif, screens
 from .device import Keyboard, enumerate_keyboards
 from .config import data_dir, set_start_at_login
 
@@ -147,6 +147,7 @@ class App:
         nb.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         self.nb = nb
         self._build_packages(nb)
+        self._build_screens(nb)
         self._build_gif(nb)
         self._build_boot(nb)
         self._build_firmware(nb)
@@ -195,7 +196,9 @@ class App:
             screen = ""
             if info.get("type") == "screen":
                 mode = pc.get("mode") or info.get("default_mode")
-                screen = api.PACKAGE_MODES.get(mode, "-")
+                fw = self.host.fw
+                screen = "Its own screen" if fw is None or fw.at_least(screens.MIN_PATCH) else \
+                    api.PACKAGE_MODES.get(mode, "-")
             elif info.get("type") == "animation":
                 screen = "Image screen"
             else:
@@ -228,6 +231,8 @@ class App:
         self._pkg_selected()
         if hasattr(self, "gif_combo"):
             self.refresh_gif_sources()
+        if hasattr(self, "scr_tv"):
+            self.refresh_screens()
 
     def _sel(self):
         s = self.pkg_tv.selection()
@@ -309,6 +314,127 @@ class App:
             return
         PackageSettings(self, m)
 
+
+    # --- screens tab ----------------------------------------------------------------------
+    def _build_screens(self, nb):
+        f = ttk.Frame(nb, padding=8)
+        nb.add(f, text="Screens")
+        ttk.Label(f, text="The keyboard's screen button goes through these screens, top to bottom. Turn screens "
+                          "on or off and move them around. Every screen package gets a screen of its own; those "
+                          "only come up while TENET Hub is running, so the keyboard never stops on a blank one.",
+                  wraplength=820, justify="left").pack(anchor="w")
+        body = ttk.Frame(f)
+        body.pack(fill="both", expand=True, pady=6)
+        cols = ("on", "kind")
+        tv = ttk.Treeview(body, columns=cols, show="tree headings", height=12, selectmode="browse")
+        tv.heading("#0", text="Screen")
+        tv.heading("on", text="In the cycle")
+        tv.heading("kind", text="Type")
+        tv.column("#0", width=330)
+        tv.column("on", width=110, anchor="center")
+        tv.column("kind", width=110)
+        tv.pack(side="left", fill="both", expand=True)
+        tv.bind("<Double-1>", lambda e: self.scr_toggle())
+        tv.bind("<<TreeviewSelect>>", lambda e: self._scr_selected())
+        self.scr_tv = tv
+        side = ttk.Frame(body)
+        side.pack(side="left", fill="y", padx=(8, 0))
+        self.b_scr_up = ttk.Button(side, text="Move up", command=lambda: self.scr_move(-1))
+        self.b_scr_up.pack(fill="x")
+        self.b_scr_down = ttk.Button(side, text="Move down", command=lambda: self.scr_move(1))
+        self.b_scr_down.pack(fill="x", pady=4)
+        self.b_scr_toggle = ttk.Button(side, text="Turn off", command=self.scr_toggle)
+        self.b_scr_toggle.pack(fill="x")
+        self.b_scr_show = ttk.Button(side, text="Show it now", command=self.scr_show)
+        self.b_scr_show.pack(fill="x", pady=(16, 0))
+        ttk.Button(side, text="Reset to default", command=self.scr_reset).pack(fill="x", pady=(4, 0))
+        self.scr_msg = tk.StringVar()
+        ttk.Label(f, textvariable=self.scr_msg, foreground="#555", wraplength=820, justify="left").pack(anchor="w")
+        self.refresh_screens()
+
+    def refresh_screens(self):
+        tv = self.scr_tv
+        sel = tv.selection()
+        tv.delete(*tv.get_children())
+        self.scr_items = screens.entries(self.cfg, self.reg)
+        for e in self.scr_items:
+            tv.insert("", "end", iid=e["id"], text=e["name"], values=("On" if e["on"] else "-", e["kind"]),
+                      tags=() if e["on"] else ("off",))
+        tv.tag_configure("off", foreground="#888")
+        if sel and tv.exists(sel[0]):
+            tv.selection_set(sel[0])
+        codes, _ = screens.keyboard_list(self.scr_items)
+        fw = self.host.fw
+        msg = f"{len(codes)} screens in the cycle (the keyboard holds up to {screens.MAX})."
+        if fw is not None and not fw.at_least(screens.MIN_PATCH):
+            msg = (f"Changing the screens needs REVIVER v{screens.MIN_PATCH} or newer (Firmware tab). "
+                   "Your choices here are kept and sent to the keyboard once it has it.")
+        self.scr_msg.set(msg)
+        self._scr_selected()
+
+    def _scr_sel(self):
+        s = self.scr_tv.selection()
+        return s[0] if s else None
+
+    def _scr_selected(self):
+        i = self._scr_sel()
+        e = next((x for x in self.scr_items if x["id"] == i), None)
+        n = [x["id"] for x in self.scr_items].index(i) if e else -1
+        self.b_scr_up.configure(state="normal" if e and n > 0 else "disabled")
+        self.b_scr_down.configure(state="normal" if e and n < len(self.scr_items) - 1 else "disabled")
+        self.b_scr_toggle.configure(state="normal" if e else "disabled", text="Turn off" if e and e["on"] else "Turn on")
+        self.b_scr_show.configure(state="normal" if e and e["on"] else "disabled")
+
+    def _scr_save(self):
+        screens.save(self.cfg, self.scr_items)          # the host sends the new list on its next tick
+        self.refresh_screens()
+
+    def scr_move(self, d):
+        i = self._scr_sel()
+        ids = [x["id"] for x in self.scr_items]
+        if i not in ids:
+            return
+        n = ids.index(i)
+        if 0 <= n + d < len(ids):
+            self.scr_items.insert(n + d, self.scr_items.pop(n))
+            self._scr_save()
+            self.scr_tv.selection_set(i)
+
+    def scr_toggle(self):
+        i = self._scr_sel()
+        e = next((x for x in self.scr_items if x["id"] == i), None)
+        if not e:
+            return
+        if e["id"].startswith("stock:") and e["on"] and \
+                not any(x["on"] for x in self.scr_items if x["id"].startswith("stock:") and x is not e):
+            messagebox.showinfo(APP_NAME, "Keep at least one built-in screen on: it's what the keyboard shows "
+                                          "when TENET Hub isn't running.")
+            return
+        if e["id"].startswith("pkg:"):
+            self.cfg.pkg(e["id"][4:])["enabled"] = not e["on"]     # same switch as on the Packages tab
+            self.cfg.save()
+        else:
+            e["on"] = not e["on"]
+        self._scr_save()
+        self.refresh_packages()
+
+    def scr_show(self):
+        i = self._scr_sel()
+        fw = self.host.fw
+        if not (fw and fw.at_least(screens.MIN_PATCH)):
+            messagebox.showinfo(APP_NAME, f"This needs REVIVER v{screens.MIN_PATCH} or newer (Firmware tab).")
+            return
+        codes, slots = screens.keyboard_list(self.scr_items)
+        code = int(i[6:]) if i.startswith("stock:") else slots.get(i[4:])
+        if code is not None:
+            self.host._request("show", code)
+
+    def scr_reset(self):
+        if not messagebox.askyesno(APP_NAME, "Put the screens back in the default order (built-in screens: "
+                                             "Dashboard, Image screen and Typing animation on)?"):
+            return
+        self.cfg.set("screens", [])
+        self._scr_save()
 
     # --- Image screen tab ----------------------------------------------------------------------
     GIF_CONTROLS = [
@@ -1029,7 +1155,9 @@ class PackageSettings(tk.Toplevel):
         body = ttk.Frame(self, padding=12)
         body.pack(fill="both")
         r = 0
-        if m["type"] == "screen":
+        fw = app.host.fw
+        self.pick_mode = m["type"] == "screen" and fw is not None and not fw.at_least(screens.MIN_PATCH)
+        if self.pick_mode:                       # before v21 packages share the keyboard's screens
             ttk.Label(body, text="Show on").grid(row=r, column=0, sticky="w", pady=3)
             names = list(api.PACKAGE_MODES.values())
             mode = pc.get("mode") or m.get("default_mode")
@@ -1074,7 +1202,7 @@ class PackageSettings(tk.Toplevel):
                 val = max(s.get("min", val), min(s.get("max", val), int(val)))
             out[k] = val
         pc["settings"] = out
-        if self.m["type"] == "screen":
+        if self.pick_mode:
             pc["mode"] = next(k for k, n in api.PACKAGE_MODES.items() if n == self.mode_var.get())
         self.app.cfg.save()
         self.app.host.reload()

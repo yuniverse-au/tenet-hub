@@ -21,22 +21,22 @@
   ],
   "firmware": [
     {
-      "name": "REVIVER v20",
-      "patch_version": 20,
-      "notes": "Custom boot logo: the keyboard now shows a TENET 70 logo when it powers on, and you can put your own image there from the Boot logo tab. Image screen: store an image or animation on the keyboard and it shows by itself, even with the PC off (upload from the Image screen tab). The screen button goes Dashboard, Now Playing, Image screen, typing animation in both directions (KPM, clock and Logo screens skipped). Also: recovery from a stuck image screen, safe flash-chip access, live drawing for packages, tear-free scrolling, screen-off support.",
+      "name": "REVIVER v21",
+      "patch_version": 21,
+      "notes": "Your screen list: choose which screens the screen button goes through and in what order, from the Screens tab (KPM, clock and the Hexcore Link logo can come back if you want them). Every screen package gets a screen of its own; package screens only come up while TENET Hub is running. Keeps everything from v20: changeable boot logo (TENET 70 by default), the image screen for images and GIFs stored on the keyboard, live drawing, tear-free scrolling, screen-off support.",
       "base": {
         "version": "3.0.7",
         "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
         "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
         "size": 86620
       },
-      "id": "v20",
+      "id": "v21",
       "patch": {
-        "url": "firmware/v20/patch.json",
-        "sha256": "3023FA83B897F13DA6783B726D4A6B0398C4E316A8AC6F39EF4107126E89C2D3"
+        "url": "firmware/v21/patch.json",
+        "sha256": "6D130491474063D43C374D108A7ABA7BC85F45362FF49A0EC595FD5AFC164A64"
       },
-      "result_sha256": "E943E39AFC61B3CBBB538B8020875E568FAA0F7CCB925FC49EEB5B2BC7E30FE4",
-      "result_size": 91396,
+      "result_sha256": "2E7BBCD804E549C1F262BEE839639D57BD9A6D338D513B5FEFCBC3528C24E73D",
+      "result_size": 92436,
       "base_sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56"
     }
   ]

@@ -3,6 +3,7 @@
 Firmware updates and screen packages for the **Metakey TENET 70** keyboard (Hexcore PCB) and its 256×32 OLED screen.
 
 - **Packages** draw live content on the keyboard's screen, like the song that's playing. Background packages can also react to PC events. New packages and updates are found automatically from this repository.
+- **Screens**: turn the keyboard's built-in screens on or off, put them in any order, and give every screen package a screen of its own.
 - **Image screen**: store an image or an animation on the keyboard and it shows by itself, even with the PC off. Before uploading you can set a frame-rate cap, brightness/contrast/gamma/invert, fit/zoom/position and trimming, with a live preview.
 - **Boot logo**: the keyboard shows a TENET 70 logo when it powers on. Put your own image there instead, or go back to the TENET 70 logo, from the Boot logo tab.
 - **Firmware**: installs **REVIVER**, our custom firmware for the TENET 70. It adds the image screen, a changeable boot logo, live drawing, tear-free scrolling and more. You can go back to the official firmware at any time.
@@ -13,13 +14,16 @@ Firmware updates and screen packages for the **Metakey TENET 70** keyboard (Hexc
 1. Download `TenetHub.exe` from [Releases](https://github.com/yuniverse-au/tenet-hub/releases/latest) and run it. It sits in the system tray and starts when you log in (you can turn that off in Settings).
 2. **Close Hexcore Link.** Only one program can talk to the keyboard at a time.
 3. Open the **Firmware** tab and install the latest **REVIVER** firmware. It takes about a minute; keep the keyboard plugged in.
-4. On the **Packages** tab, turn on the packages you want. Now Playing is included and shows on the keyboard's *Custom Text* screen. Press the keyboard's screen button to get there.
+4. On the **Packages** tab, turn on the packages you want. Now Playing is included. Each screen package gets a screen of its own on the keyboard; press the keyboard's screen button to get there.
+
+### Screens
+The **Screens** tab sets which screens the keyboard's screen button goes through, and in what order. Built-in screens (Dashboard, KPM, clock, the Hexcore Link logo, image screen, typing animation) can be turned on or off and moved; every screen package gets a screen of its own in the same list, up to 24 screens in all. The list is stored on the keyboard, so the button works the same with the PC off. Package screens only come up while TENET Hub is running, so the keyboard never stops on a blank screen. Needs REVIVER v21 or newer.
 
 ### Image screen
 1. Open the **Image screen** tab and open an image (PNG, JPG, BMP...) or a GIF, or pick an animation package.
 2. Adjust it while watching the preview. The line under the preview shows how much of the keyboard's storage it uses.
 3. Click *Put it on the keyboard*. Uploads only rewrite frames that changed, and every frame is verified.
-4. Press the screen button until you reach the image screen. REVIVER's screen button goes Dashboard → Now Playing → image screen → typing animation; the KPM, clock and Logo screens are skipped.
+4. Press the screen button until you reach the image screen.
 
 How many frames fit depends on the keyboard's flash chip (about 190 on a 1 MB chip, 440 on 2 MB); the tab shows the real number. Big changes between frames (more than half the screen) play at around 5-8 fps; small changes play faster. *Smoothness vs typing* trades the two. *Save as a package* keeps a GIF and its adjustments as a local animation package.
 

@@ -1,4 +1,4 @@
-"""A fake TENET 70 for tests: speaks the vendor protocol (REVIVER v20) and the IAP protocol.
+"""A fake TENET 70 for tests: speaks the vendor protocol (REVIVER v21) and the IAP protocol.
 Install with sys.modules['hid'] = fake_hid. Records everything and flags pipelined packets."""
 import struct, threading, time
 
@@ -6,7 +6,7 @@ VID, PID = 0x3311, 0xF005
 
 
 class Board:
-    def __init__(self, patch=20):
+    def __init__(self, patch=21):
         self.patch = patch
         self.state = "app"          # "app" | "iap" | "gone"
         self.mode = 5
@@ -20,6 +20,10 @@ class Board:
         self.chip = 2 * 1024 * 1024
         self.spi = bytearray(b"\xff" * self.chip)
         self.gif_writes = 0
+        self.scr = [1, 0x80, 6, 7]       # v21 screen list
+        self.slot = 0
+        self.hub_alive = False
+        self.list_writes = 0
 
     def _gif(self, sub, a):
         import zlib
@@ -51,6 +55,43 @@ class Board:
             if ok(off, n):
                 return b"\x00" + struct.pack("<I", zlib.crc32(bytes(self.spi[base + off:base + off + n])))
         return b"\x01"
+
+    def _screens(self, sub, a):
+        ok = True
+        valid = lambda e: (1 <= e <= 7 and e != 5) or 0x80 <= e < 0x98
+        if sub == 0x20:
+            self.hub_alive = True
+        elif sub == 0x21:
+            n, l = a[0], list(a[1:1 + a[0]])
+            ok = 1 <= n <= 24 and all(map(valid, l)) and len(set(l)) == n and any(e < 0x80 for e in l)
+            if ok:
+                self.scr, self.list_writes = l, self.list_writes + 1
+        elif sub == 0x22:
+            ok = valid(a[0])
+            if ok:
+                if a[0] >= 0x80:
+                    self.mode, self.slot = 5, a[0] - 0x80
+                else:
+                    self.mode = a[0]
+        if not ok:
+            return b"\x01"
+        cur = 0x80 + self.slot if self.mode == 5 else self.mode
+        return bytes([0, self.mode, cur, self.hub_alive, len(self.scr)] + self.scr)
+
+    def press(self, forward=True):
+        """The screen button, as the v21 firmware does it."""
+        l = self.scr
+        cur = 0x80 + self.slot if self.mode == 5 else self.mode
+        at = l.index(cur) if cur in l else (len(l) - 1 if forward else 0)
+        for k in range(1, len(l) + 1):
+            e = l[(at + (k if forward else -k)) % len(l)]
+            if e >= 0x80 and not self.hub_alive:
+                continue
+            if e >= 0x80:
+                self.mode, self.slot = 5, e - 0x80
+            else:
+                self.mode = e
+            return
 
     def reply(self, hdr, cmd, payload=b""):
         body = cmd + payload
@@ -94,6 +135,8 @@ class Board:
                 return R(cmd, self._gif(sub, args))
             if 0x1B <= sub <= 0x1E and self.patch >= 20:
                 return R(cmd, self._gif(sub, args))
+            if 0x1F <= sub <= 0x22 and self.patch >= 21:
+                return R(cmd, self._screens(sub, args))
             return None
         R = lambda c, pl=b"": self.reply(bytes([0x7B, 0x10, 0x13, 0x10]), c, pl)
         if cmd == b"\x01\x01":
