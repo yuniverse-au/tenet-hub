@@ -21,7 +21,7 @@ def sha(b):
 
 
 def zip_package(folder, out_path):
-    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
+    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_STORED) as z:     # stored: identical bytes on every OS
         for base, dirs, files in os.walk(folder):
             dirs[:] = sorted(d for d in dirs if d != "__pycache__" and not d.startswith("."))
             for f in sorted(files):
@@ -29,7 +29,7 @@ def zip_package(folder, out_path):
                     continue
                 p = os.path.join(base, f)
                 info = zipfile.ZipInfo(os.path.relpath(p, folder).replace(os.sep, "/"), (2026, 1, 1, 0, 0, 0))
-                info.compress_type = zipfile.ZIP_DEFLATED
+                info.compress_type = zipfile.ZIP_STORED
                 z.writestr(info, open(p, "rb").read())      # fixed timestamps: same zip each build
 
 
