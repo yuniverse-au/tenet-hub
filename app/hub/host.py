@@ -257,9 +257,17 @@ class Host:
                     r = self.kb.cmd(0x24, pcstats.label_payload(slot, text))
                     if r is not None and r[:1] == b"\x00":
                         self._labels_sent[slot] = text
+                    else:
+                        self._labels_sent[slot] = text           # don't retry every tick (each one redraws)
+                        self.log("PC stats label refused:", slot, text, r.hex() if r else r)
         if current == screenlist.STATS and time.time() - self._stats_at >= 1.0:
+            first = time.time() - self._stats_at > 3
             self._stats_at = time.time()
-            self.kb.cmd(0x09, self.stats.values())       # stock 70 09: CPU, GPU, DISK (0-99)
+            vals = self.stats.values()
+            r = self.kb.cmd(0x09, vals)                  # stock 70 09: CPU, GPU, DISK (0-99)
+            if first or r != getattr(self, "_stats_reply", b"\x00"):
+                self.log("PC stats values sent:", list(vals), "reply", r.hex() if r else r)
+            self._stats_reply = r
 
     # --- the keyboard's clock (Dashboard / Clock screens) -------------------------------
     CLOCK_EVERY = 60
@@ -345,6 +353,7 @@ class Host:
                 if mode is None and self.fw.at_least(6):
                     raise IOError("no reply")
             if mode != self.mode:
+                self.log("keyboard screen:", hex(mode) if mode is not None else mode)
                 self.mode = mode
                 self.screen.forget()
                 self._event("mode", mode)
