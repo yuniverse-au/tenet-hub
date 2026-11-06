@@ -266,8 +266,10 @@ class App:
             lines.append(info.get("description", ""))
             src = self.reg.source_of(pid) if m else (a or {}).get("_source")
             if src:
+                auto = self.cfg["auto_update_community"]
                 lines += ["", f"Community package from {packages.source_page(src)} - not made or checked by "
-                              "TENET Hub. Updates install when you click Update."]
+                              "TENET Hub. " + ("It updates automatically (Settings)." if auto else
+                                                 "Updates install when you click Update.")]
             need = int(info.get("requires_firmware") or 0)
             if need:
                 lines.append("")
@@ -1200,7 +1202,8 @@ class App:
             self.vars[key] = v
             ttk.Checkbutton(f, text=label, variable=v, command=self.save_settings).pack(anchor="w", pady=2)
         check("start_at_login", "Start TENET Hub when I log in")
-        check("auto_update_packages", "Update packages automatically (firmware is never updated without asking)")
+        check("auto_update_packages", "Update official packages automatically (firmware is never updated without asking)")
+        check("auto_update_community", "Update community packages automatically too (they aren't checked by TENET Hub)")
         check("off_when_pc_sleeps", "Turn the keyboard screen off when the PC sleeps or shuts down")
         check("off_with_monitor", "...and when Windows turns the monitor off")
         check("burn_in_shift", "Burn-in protection: nudge package screens sideways every 2 minutes")
@@ -1351,7 +1354,8 @@ class App:
         new, upd = self.reg.refresh()
         if self.reg.index_error:
             return
-        auto = self.reg.auto_updatable() if self.cfg["auto_update_packages"] else []
+        auto = self.reg.auto_updatable(official=self.cfg["auto_update_packages"],
+                                       community=self.cfg["auto_update_community"])
         if auto:
             for pid in auto:
                 old = self.reg.installed[pid]["version"]
@@ -1421,7 +1425,8 @@ class CommunitySources(tk.Toplevel):
         ttk.Label(f, text="Community packages come from other people's GitHub repos. Add a repo by its link "
                           "(for example github.com/someone/tenet-packages) and its packages show up in the "
                           "Packages tab, marked with where they're from. TENET Hub doesn't check them: only "
-                          "add people you trust. Community packages never update by themselves.",
+                          "add people you trust. Community packages only update when you click Update, unless you "
+                          "turn on automatic community updates in Settings.",
                   wraplength=560, justify="left").pack(anchor="w")
         row = ttk.Frame(f)
         row.pack(fill="x", pady=(10, 4))

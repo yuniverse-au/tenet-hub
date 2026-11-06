@@ -131,6 +131,8 @@ community_repo("alice", {"alice-clock": "1.1.0"})
 reg.refresh()
 check(f"community update found but not automatic: updatable={reg.updatable()} auto={reg.auto_updatable()}",
       "alice-clock" in reg.updatable() and "alice-clock" not in reg.auto_updatable())
+check("...unless the user opted in to automatic community updates",
+      "alice-clock" in reg.auto_updatable(community=True) and reg.auto_updatable(official=False, community=False) == [])
 mallory = community_repo("mallory", {"alice-clock": "9.9.9"})
 reg.add_source(mallory)
 check("another source can't update or replace it",

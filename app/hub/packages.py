@@ -19,7 +19,7 @@ Community sources: other people's catalogues (the same index.json format, in the
 added by the user in the Packages tab. cfg["community_sources"] = [index.json URL, ...]. They can only
 offer packages: their "firmware" and "hub" entries are ignored, and a package can't take the id of an
 official one. Each installed package remembers its source (cfg.pkg(id)["source"], None = official);
-it only ever updates from that source, and community packages update when the user says so (official
+it only ever updates from that source, and community packages update when the user says so, or automatically if they opted in (official
 ones update automatically if the user allows it).
 """
 import importlib.util, io, json, os, re, shutil, sys, threading, time, zipfile
@@ -305,9 +305,10 @@ class Registry:
                 if pid in av and av[pid].get("_source") == self.source_of(pid)
                 and vtuple(av[pid]["version"]) > vtuple(m["version"])]
 
-    def auto_updatable(self):
-        """Updates that may install by themselves: official packages only."""
-        return [pid for pid in self.updatable() if not self.source_of(pid)]
+    def auto_updatable(self, official=True, community=False):
+        """Updates that may install by themselves: official packages, and community ones if the user
+        opted in (Settings)."""
+        return [pid for pid in self.updatable() if (community if self.source_of(pid) else official)]
 
     def hub_update(self):
         h = (self.index or {}).get("hub") or {}

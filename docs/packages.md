@@ -98,4 +98,4 @@ Extra `.py` files in your package folder can be imported relatively (`from . imp
 
 ## Rules
 - Don't talk to the keyboard yourself. The host owns the connection and sends strictly one packet per reply. Sending faster has jammed a keyboard before.
-- Packages run as normal programs on the user's PC. TENET Hub installs from the official catalogue (this repository: review package code before merging it), from community sources the user added themselves, and from folders the user put in the packages folder. Official packages update automatically; community packages only when the user clicks Update.
+- Packages run as normal programs on the user's PC. TENET Hub installs from the official catalogue (this repository: review package code before merging it), from community sources the user added themselves, and from folders the user put in the packages folder. Official packages update automatically; community packages when the user clicks Update, or automatically if they opted in (Settings).

@@ -61,7 +61,7 @@ Say in your README what each package does, what it needs (for example "needs REV
 2. Optionally add a `"changelog": "What changed"` line to `package.json`. TENET Hub shows it next to the Update button.
 3. Rebuild the catalogue and push.
 
-People get an "Updates available" notification within a few hours (TENET Hub checks at start-up and every few hours), and the update installs when they click **Update**. Community packages never update by themselves. Only official packages do that.
+People get an "Updates available" notification within a few hours (TENET Hub checks at start-up and every few hours), and the update installs when they click **Update**. People who turned on *Update community packages automatically* in Settings (it's off by default) get it without clicking.
 
 A package installed from your repo only ever updates from your repo. Nobody else's repo can replace it, even with the same id.
 

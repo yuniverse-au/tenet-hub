@@ -15,7 +15,8 @@ DEFAULTS = {
     "index_url": DEFAULT_INDEX,
     "check_updates": True,          # check GitHub for new packages / updates
     "check_every_hours": 6,
-    "auto_update_packages": True,   # firmware is never updated automatically
+    "auto_update_packages": True,   # official packages; firmware is never updated automatically
+    "auto_update_community": False, # community packages too (opt in: new code from someone unvetted)
     "start_at_login": True,
     "off_when_pc_sleeps": True,     # screen off while the PC sleeps / shuts down
     "off_with_monitor": True,       # ...and while Windows has the monitor off
