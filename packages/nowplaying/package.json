@@ -1,0 +1,16 @@
+{
+  "id": "nowplaying",
+  "name": "Now Playing",
+  "version": "1.0.0",
+  "type": "screen",
+  "description": "Shows the song playing on your PC (Spotify, YouTube in a browser, any app that shows up in Windows' media controls): title, artist, time, a progress bar and an audio spectrum.",
+  "author": "Yuniverse",
+  "default_mode": 5,
+  "requires_firmware": 6,
+  "settings": [
+    {"key": "spectrum", "type": "bool", "default": true, "label": "Audio spectrum in the corner"},
+    {"key": "spectrum_fps", "type": "int", "default": 12, "min": 2, "max": 20, "label": "Spectrum updates per second"},
+    {"key": "nothing_off_sec", "type": "int", "default": 60, "min": 0, "max": 3600, "label": "Screen off after nothing plays for (seconds, 0 = never)"},
+    {"key": "auto_switch", "type": "bool", "default": false, "label": "Jump to this screen when music starts"}
+  ]
+}

@@ -1,0 +1,42 @@
+name: Build TENET Hub
+
+on:
+  push:
+    tags: ["v*"]          # e.g. git tag v1.0.0 && git push --tags  -> a Release with TenetHub.exe
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt pyinstaller
+      - name: Check the catalogue is up to date
+        run: |
+          python tools/build_index.py
+          git diff --exit-code -- index.json catalog
+      - name: Build
+        run: >
+          python -m PyInstaller --noconfirm --onefile --noconsole --name TenetHub
+          --paths app --add-data "packages;packages"
+          --collect-all winrt --collect-all soundcard --collect-submodules pystray
+          --hidden-import hub._bundle
+          app/tenet_hub.py
+      - name: Smoke test (imports and package loading, no keyboard needed)
+        run: python -c "import sys; sys.path.insert(0,'app'); import hub.ui, hub.host, hub.packages, hub.firmware, hub.flasher; print('ok')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TenetHub
+          path: dist/TenetHub.exe
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/TenetHub.exe
