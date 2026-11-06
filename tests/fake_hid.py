@@ -24,6 +24,9 @@ class Board:
         self.slot = 0
         self.hub_alive = False
         self.list_writes = 0
+        self.time = None                 # 70 07 args (month, day, weekday, h, m, s)
+        self.clock_12h = None
+        self.settings_writes = 0
 
     def _gif(self, sub, a):
         import zlib
@@ -112,6 +115,13 @@ class Board:
             if cmd == b"\x02\x01" and args[:1] == b"\x01":
                 self.state = "iap"
                 return None
+            if cmd == b"\x70\x07" and len(args) == 6:          # stock: set the clock (any firmware)
+                self.time = tuple(args)
+                return R(cmd, b"\x00")
+            if cmd == b"\x70\x0a" and len(args) == 1:          # stock: 12/24-hour (saved to flash)
+                self.clock_12h = bool(args[0])
+                self.settings_writes += 1
+                return R(cmd, b"\x00")
             if cmd[0] != 0x70 or self.patch == 0:
                 return None
             sub = cmd[1]

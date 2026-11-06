@@ -114,6 +114,18 @@ class Keyboard:
         r = self.cmd(0x22, bytes([code]))
         return r is not None and r[:1] == b"\x00"
 
+    # --- stock commands (what Hexcore Link sends; the official firmware answers them too) ------
+    def set_time(self, dt):
+        """70 07: month, day, weekday (Mon=1..Sun=7), hour, minute, second. The keyboard keeps
+        counting from there; the Dashboard shows time/date/day once it has been set."""
+        r = self.cmd(0x07, bytes([dt.month, dt.day, dt.isoweekday(), dt.hour, dt.minute, dt.second]))
+        return r is not None and r[:1] == b"\x00"
+
+    def set_clock_12h(self, twelve):
+        """70 0A: 1 = 12-hour clock, 0 = 24-hour. Saved in the keyboard's settings (a flash write)."""
+        r = self.cmd(0x0A, bytes([1 if twelve else 0]))
+        return r is not None and r[:1] == b"\x00"
+
     def set_mode(self, m):
         return self.cmd(0x13, bytes([m])) == b"\x00"
 

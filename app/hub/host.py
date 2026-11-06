@@ -5,12 +5,12 @@ that screen it gets frame() calls at its fps and its images are drawn. Backgroun
 events. The host also does the screen-off rules (PC asleep / monitor off, idle, nothing to show),
 nudges package screens sideways against burn-in, and reconnects when the keyboard is replugged.
 """
-import ctypes, os, sys, threading, time, traceback
+import ctypes, datetime, os, sys, threading, time, traceback
 
 from PIL import Image
 
 from . import screens as screenlist, api, power
-from .config import data_dir
+from .config import data_dir, windows_uses_12h
 from .device import Keyboard, enumerate_keyboards
 from .screen import Screen
 
@@ -48,6 +48,7 @@ class Host:
         self.mode = None
         self.slots, self.want = {}, None             # v21: package id -> screen code; list to keep
         self._sent_list, self._sent_at = None, 0.0
+        self._clock_at, self._clock_fmt = 0.0, None   # last clock sync; 12h flag sent this connection
         self.running = {}                 # id -> Running
         self.problems = {}                # id -> why it isn't running
         self.paused = threading.Event()   # set while flashing: the host lets go of the keyboard
@@ -101,6 +102,7 @@ class Host:
 
     def _wake(self):
         self.asleep = False
+        self._clock_at = 0.0                         # the PC slept: set the keyboard's clock again
         with self.lock:
             if self.screen:
                 self.screen.hold_off = False
@@ -215,6 +217,7 @@ class Host:
         fw = kb.probe()
         self.kb, self.fw = kb, fw
         self._sent_list, self._sent_at = None, 0.0
+        self._clock_at, self._clock_fmt = 0.0, None   # last clock sync; 12h flag sent this connection
         self.screen = Screen(kb, fw, self.cfg["contrast"]) if fw.at_least(1) else None
         if self.screen:
             self.screen.hold_off = self.asleep
@@ -231,6 +234,33 @@ class Host:
         self.problems.clear()                      # firmware may have changed: re-check
         self._event("connected", fw)
         return True
+
+    # --- the keyboard's clock (Dashboard / Clock screens) -------------------------------
+    CLOCK_EVERY = 60
+
+    def want_12h(self):
+        f = self.cfg.get("clock_format", "auto")
+        if f in ("12", "24"):
+            return f == "12"
+        w = windows_uses_12h()
+        return bool(w) if w is not None else False
+
+    def _sync_clock(self):
+        if not self.cfg.get("sync_clock", True):
+            return
+        now = time.time()
+        twelve = self.want_12h()
+        if twelve != self._clock_fmt:                # once per connection or when changed: it's a flash write
+            if self.kb.set_clock_12h(twelve):
+                self._clock_fmt = twelve
+        # every minute, just after the minute turns (the keyboard counts seconds by itself in between)
+        if now - self._clock_at >= self.CLOCK_EVERY or (int(now // 60) != int(self._clock_at // 60) and now % 60 < 2):
+            t = datetime.datetime.now()
+            if self.kb.set_time(t):
+                self._clock_at = now
+                if not getattr(self, "_clock_logged", False):
+                    self.log("keyboard clock set:", t.strftime("%a %d %b %H:%M:%S"))
+                    self._clock_logged = True
 
     # --- main loop ------------------------------------------------------------------------
     def _loop(self):
@@ -253,6 +283,7 @@ class Host:
                 self._sync_packages()
                 return 2.0
             self._sync_packages()
+            self._sync_clock()
             v21 = self._v21()
             while self._requests:
                 kind, value, pid = self._requests.pop(0)

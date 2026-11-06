@@ -21,7 +21,9 @@ DEFAULTS = {
     "off_with_monitor": True,       # ...and while Windows has the monitor off
     "idle_off_min": 5,              # package screens: off after this long without input (0 = never)
     "contrast": 0x3D,
-    "burn_in_shift": True,          # nudge package screens sideways every 2 minutes
+    "burn_in_shift": True,
+    "sync_clock": True,             # set the keyboard's clock (Dashboard + Clock screens) from the PC
+    "clock_format": "auto",         # "auto" (follow Windows) | "12" | "24"          # nudge package screens sideways every 2 minutes
     "packages": {},                 # id -> {"enabled": bool, "mode": int, "settings": {...}}
     "seen": [],                     # package ids already shown to the user (for "New")
     "last_check": 0,
@@ -82,3 +84,17 @@ def set_start_at_login(enabled):
             except FileNotFoundError:
                 pass
     return True
+
+
+def windows_uses_12h():
+    """True if Windows' time format is 12-hour (h:mm tt), False if 24-hour. None if unknown."""
+    if sys.platform != "win32":
+        return None
+    try:
+        import ctypes
+        buf = ctypes.create_unicode_buffer(80)
+        if ctypes.windll.kernel32.GetLocaleInfoEx(None, 0x1003, buf, 80):      # LOCALE_STIMEFORMAT
+            return "H" not in buf.value
+    except Exception:
+        pass
+    return None

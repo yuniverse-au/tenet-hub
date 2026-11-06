@@ -149,7 +149,7 @@ n = len(B.cmds)
 for _ in range(5):
     host._tick()
 check(f"unchanged frames send nothing ({len(B.cmds) - n} packets, all mode reads)",
-      all(c == "7012" for c in B.cmds[n:]))
+      all(c in ("7012", "7007") for c in B.cmds[n:]))
 cfg.pkg("nowplaying")["enabled"] = True
 cfg.save(); host._tick()
 check(f"two screen packages on screen 5: second one waits ({host.problems})",
@@ -169,7 +169,7 @@ B.mode = 6
 host._tick()
 n = len(B.cmds)
 host._tick()
-check("mode 6 (firmware's dither): host leaves the screen alone", all(c == "7012" for c in B.cmds[n:]))
+check("mode 6 (firmware's dither): host leaves the screen alone", all(c in ("7012", "7007") for c in B.cmds[n:]))
 host._sleep()
 n = len(B.cmds)
 for _ in range(3):
@@ -192,6 +192,27 @@ B.patch = 4
 host._disconnect("x"); host._tick()
 check(f"older patch on the keyboard: problems {host.problems}",
       "Needs REVIVER v6" in host.problems.get("nowplaying", "") and "hello" not in host.problems)
+
+# --- keyboard clock (stock 70 07 / 70 0A, what Hexcore Link sends) ------------------------------
+import datetime
+B.patch, B.state = 0, "app"                       # works on the official firmware too
+host._disconnect("x"); B.time = None; B.settings_writes = 0
+cfg.data["clock_format"] = "24"; host._tick()
+t = datetime.datetime.now()
+check(f"clock set on connect (official firmware): {B.time}", B.time is not None and B.time[:3] == (t.month, t.day, t.isoweekday())
+      and abs((B.time[3] * 3600 + B.time[4] * 60 + B.time[5]) - (t.hour * 3600 + t.minute * 60 + t.second)) <= 2)
+check(f"24-hour sent once: 12h={B.clock_12h}, {B.settings_writes} write", B.clock_12h is False and B.settings_writes == 1)
+n = B.cmds.count("7007")
+for _ in range(3):
+    host._tick()
+check("not resent every tick", B.cmds.count("7007") - n <= 1 and B.settings_writes == 1)
+host._clock_at -= 61; host._tick()
+check("resent after a minute", B.cmds.count("7007") > n)
+cfg.data["clock_format"] = "12"; host._tick()
+check("switching to 12-hour sends it", B.clock_12h is True and B.settings_writes == 2)
+cfg.data["sync_clock"] = False; host._clock_at = 0; n = B.cmds.count("7007"); host._tick()
+check("sync off: no clock packets", B.cmds.count("7007") == n)
+cfg.data["sync_clock"] = True; cfg.data["clock_format"] = "auto"
 
 # --- v21: screen list, every screen package on a screen of its own ----------------------------
 from hub import screens as screenlist

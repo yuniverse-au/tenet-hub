@@ -19,6 +19,9 @@ Firmware updates and screen packages for the **Metakey TENET 70** keyboard (Hexc
 ### Screens
 The **Screens** tab sets which screens the keyboard's screen button goes through, and in what order. Built-in screens (Dashboard, KPM, clock, the Hexcore Link logo, image screen, typing animation) can be turned on or off and moved; every screen package gets a screen of its own in the same list, up to 24 screens in all. The list is stored on the keyboard, so the button works the same with the PC off. Package screens only come up while TENET Hub is running, so the keyboard never stops on a blank screen. Needs REVIVER v21 or newer.
 
+### Clock and Dashboard
+TENET Hub sets the keyboard's clock from your PC (the same thing Hexcore Link does), so the **Dashboard** shows the time, date and day and the **Clock** screen shows the right time. It syncs when the keyboard connects, after the PC wakes and once a minute. Choose 12- or 24-hour (or *Same as Windows*) in Settings. This works on the official firmware too.
+
 ### Image screen
 1. Open the **Image screen** tab and open an image (PNG, JPG, BMP...) or a GIF, or pick an animation package.
 2. Adjust it while watching the preview. The line under the preview shows how much of the keyboard's storage it uses.

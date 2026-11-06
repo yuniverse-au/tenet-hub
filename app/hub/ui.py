@@ -1069,6 +1069,16 @@ class App:
         check("off_when_pc_sleeps", "Turn the keyboard screen off when the PC sleeps or shuts down")
         check("off_with_monitor", "...and when Windows turns the monitor off")
         check("burn_in_shift", "Burn-in protection: nudge package screens sideways every 2 minutes")
+        check("sync_clock", "Set the keyboard's clock from this PC (Dashboard and Clock screens: time, date, day)")
+        row = ttk.Frame(f)
+        row.pack(anchor="w", pady=(2, 0))
+        ttk.Label(row, text="Clock format on the keyboard:").pack(side="left")
+        self.CLOCK_FORMATS = {"auto": "Same as Windows", "12": "12-hour", "24": "24-hour"}
+        self.clock_var = tk.StringVar(value=self.CLOCK_FORMATS.get(self.cfg.get("clock_format", "auto")))
+        cb = ttk.Combobox(row, textvariable=self.clock_var, values=list(self.CLOCK_FORMATS.values()),
+                          state="readonly", width=16)
+        cb.pack(side="left", padx=6)
+        cb.bind("<<ComboboxSelected>>", lambda e: self.save_settings())
         row = ttk.Frame(f)
         row.pack(anchor="w", pady=6)
         ttk.Label(row, text="Package screens turn off after").pack(side="left")
@@ -1117,6 +1127,8 @@ class App:
         except (tk.TclError, ValueError):
             pass
         self.cfg.data["contrast"] = int(self.contrast_var.get())
+        self.cfg.data["clock_format"] = next((k for k, v in self.CLOCK_FORMATS.items() if v == self.clock_var.get()), "auto")
+        self.host._clock_at = 0.0                    # apply clock changes right away
         url = self.index_var.get().strip()
         changed_url = url and url != self.cfg["index_url"]
         if url:
