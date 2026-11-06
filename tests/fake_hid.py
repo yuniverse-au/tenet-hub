@@ -28,6 +28,7 @@ class Board:
         self.stats_values = None         # stock 70 09
         self.stats_on = False            # mode 6 shows PC stats
         self.stats_labels = [b""] * 3    # v25 70 24 (b"" = the stock picture)
+        self.lights = None               # stock 20 03 FF 01 r g b
         self.time = None                 # 70 07 args (month, day, weekday, h, m, s)
         self.clock_12h = None
         self.settings_writes = 0
@@ -142,6 +143,9 @@ class Board:
             if cmd == b"\x70\x0a" and len(args) == 1:          # stock: 12/24-hour (saved to flash)
                 self.clock_12h = bool(args[0])
                 self.settings_writes += 1
+                return R(cmd, b"\x00")
+            if cmd == b"\x20\x03" and len(args) == 5 and args[:2] == b"\xff\x01":   # stock: all keys one colour
+                self.lights = tuple(args[2:5])
                 return R(cmd, b"\x00")
             if cmd[0] != 0x70 or self.patch == 0:
                 return None

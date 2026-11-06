@@ -23,7 +23,9 @@ DEFAULTS = {
     "idle_off_min": 5,              # package screens: off after this long without input (0 = never)
     "contrast": 0x3D,
     "burn_in_shift": True,
-    "sync_clock": True,             # set the keyboard's clock (Dashboard + Clock screens) from the PC
+    "sync_clock": True,
+    "lighting": "keep",             # keyboard lights: "keep" (its own) | "solid" | "off"
+    "lighting_color": "#FFFFFF",             # set the keyboard's clock (Dashboard + Clock screens) from the PC
     "clock_format": "auto",         # "auto" (follow Windows) | "12" | "24"          # nudge package screens sideways every 2 minutes
     "packages": {},                 # id -> {"enabled": bool, "mode": int, "settings": {...}}
     "seen": [],                     # package ids already shown to the user (for "New")

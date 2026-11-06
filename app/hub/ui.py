@@ -153,6 +153,7 @@ class App:
         self._build_stats(nb)
         self._build_gif(nb)
         self._build_boot(nb)
+        self._build_lighting(nb)
         self._build_firmware(nb)
         self._build_settings(nb)
         nb.bind("<<NotebookTabChanged>>", lambda e: self._tab_changed())
@@ -1012,6 +1013,57 @@ class App:
             self.boot_msg.set(f"Couldn't restore it: {err}" if err else
                               "Restored. The keyboard shows the TENET 70 logo when it powers on."),
             self.boot_progress.configure(value=0)))
+
+    # --- lighting tab ----------------------------------------------------------------------
+    LIGHTING = {"keep": "The keyboard's own lighting", "solid": "One colour", "off": "Off"}
+
+    def _build_lighting(self, nb):
+        f = ttk.Frame(nb, padding=8)
+        nb.add(f, text="Lighting")
+        ttk.Label(f, text="The keyboard's key lights. TENET Hub sets them each time the keyboard connects; "
+                          "it works on every firmware, official or REVIVER.",
+                  wraplength=820, justify="left").pack(anchor="w")
+        box = ttk.LabelFrame(f, text="Key lights", padding=8)
+        box.pack(fill="x", pady=(8, 0))
+        self.light_mode = tk.StringVar(value=self.cfg.get("lighting", "keep"))
+        for key, label in self.LIGHTING.items():
+            row = ttk.Frame(box)
+            row.pack(anchor="w", fill="x", pady=2)
+            ttk.Radiobutton(row, text=label, value=key, variable=self.light_mode,
+                            command=self._lighting_changed).pack(side="left")
+            if key == "solid":
+                self.light_swatch = tk.Label(row, width=4, relief="solid", borderwidth=1)
+                self.light_swatch.pack(side="left", padx=(12, 6))
+                ttk.Button(row, text="Choose colour...", command=self.lighting_pick).pack(side="left")
+        self.light_msg = tk.StringVar()
+        ttk.Label(box, textvariable=self.light_msg, foreground="#555", wraplength=800,
+                  justify="left").pack(anchor="w", pady=(8, 0))
+        self._lighting_show()
+
+    def _lighting_show(self):
+        c = self.cfg.get("lighting_color") or "#FFFFFF"
+        self.light_swatch.configure(background=c)
+        mode = self.light_mode.get()
+        self.light_msg.set({
+            "keep": "TENET Hub leaves the lights alone. If it changed them, the keyboard's own lighting comes "
+                    "back the next time the keyboard restarts (unplug it and plug it back in).",
+            "solid": f"Every key lit in {c.upper()}. Hexcore Link, if it's running, may change them again.",
+            "off": "All key lights off. Hexcore Link, if it's running, may change them again.",
+        }[mode])
+
+    def _lighting_changed(self):
+        self.cfg.set("lighting", self.light_mode.get())
+        self._lighting_show()
+
+    def lighting_pick(self):
+        from tkinter import colorchooser
+        rgb, hexc = colorchooser.askcolor(color=self.cfg.get("lighting_color") or "#FFFFFF",
+                                          title="Key light colour", parent=self.root)
+        if not hexc:
+            return
+        self.cfg.set("lighting_color", hexc.upper())
+        self.light_mode.set("solid")
+        self._lighting_changed()
 
     # --- firmware tab ----------------------------------------------------------------------
     def _build_firmware(self, nb):

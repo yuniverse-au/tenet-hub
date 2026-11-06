@@ -62,9 +62,10 @@ class Keyboard:
         except Exception:
             pass
 
-    def cmd(self, sub, payload=b"", timeout=300):
-        """One 70-xx packet; waits for the ACK. Returns the reply payload or None."""
-        p = bytes([0x7B, 0x12, 0x31, 0x00, 2 + len(payload), 0, 0, 0x7D, 0x70, sub]) + bytes(payload)
+    def cmd(self, sub, payload=b"", timeout=300, group=0x70):
+        """One packet (70-xx unless `group` says otherwise); waits for the ACK. Returns the reply
+        payload or None."""
+        p = bytes([0x7B, 0x12, 0x31, 0x00, 2 + len(payload), 0, 0, 0x7D, group, sub]) + bytes(payload)
         with self.lock:
             self.dev.write(b"\x00" + p.ljust(64, b"\x00"))
             end = time.time() + timeout / 1000
@@ -75,9 +76,15 @@ class Keyboard:
                 r = bytes(self.dev.read(64, timeout_ms=left) or b"")
                 if not r:
                     return None
-                if r[8:10] == bytes([0x70, sub]):
+                if r[8:10] == bytes([group, sub]):
                     return r[10:10 + r[4] - 2]
                 # an unrelated report (e.g. the keyboard talking to Hexcore Link): keep waiting
+
+    def lights(self, rgb):
+        """Every key one colour (stock 20 03, what Hexcore Link sends; (0, 0, 0) = off). Live only:
+        the keyboard goes back to its own lighting when it powers on. -> True if accepted."""
+        r = self.cmd(0x03, bytes([0xFF, 0x01] + [max(0, min(255, int(c))) for c in rgb]), group=0x20)
+        return r is not None and r[:1] == b"\x00"
 
     # --- firmware identification ---------------------------------------------------------
     def probe(self):

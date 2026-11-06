@@ -227,6 +227,7 @@ class Host:
         self._sent_list, self._sent_at = None, 0.0
         self._clock_at, self._clock_fmt = 0.0, None   # last clock sync; 12h flag sent this connection
         self._units_sent, self._stats_at, self._labels_sent = None, 0.0, {}
+        self._lights_sent = None
         self.screen = Screen(kb, fw, self.cfg["contrast"]) if fw.at_least(1) else None
         if self.screen:
             self.screen.hold_off = self.asleep
@@ -268,6 +269,31 @@ class Host:
             if first or r != getattr(self, "_stats_reply", b"\x00"):
                 self.log("PC stats values sent:", list(vals), "reply", r.hex() if r else r)
             self._stats_reply = r
+
+    # --- keyboard lights (stock 20 03; any firmware) ---------------------------------------
+    def lighting_rgb(self):
+        """What the lights should be: an (r, g, b), or None to leave the keyboard's own lighting."""
+        mode = self.cfg.get("lighting", "keep")
+        if mode == "off":
+            return (0, 0, 0)
+        if mode == "solid":
+            c = str(self.cfg.get("lighting_color") or "#FFFFFF").lstrip("#")
+            try:
+                return tuple(int(c[i:i + 2], 16) for i in (0, 2, 4))
+            except ValueError:
+                return (255, 255, 255)
+        return None
+
+    def _sync_lighting(self):
+        want = self.lighting_rgb()
+        if want is None or want == self._lights_sent:
+            return
+        if self.kb.lights(want):
+            self._lights_sent = want
+            self.log("keyboard lights:", "off" if want == (0, 0, 0) else "#%02X%02X%02X" % want)
+        else:
+            self._lights_sent = want                   # don't retry every tick
+            self.log("the keyboard didn't accept the lighting command")
 
     # --- the keyboard's clock (Dashboard / Clock screens) -------------------------------
     CLOCK_EVERY = 60
@@ -318,6 +344,7 @@ class Host:
                 return 2.0
             self._sync_packages()
             self._sync_clock()
+            self._sync_lighting()
             v21 = self._v21()
             while self._requests:
                 kind, value, pid = self._requests.pop(0)

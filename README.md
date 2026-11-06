@@ -7,6 +7,7 @@ Firmware updates and screen packages for the **Metakey TENET 70** keyboard (Hexc
 - **Image screen**: store an image or an animation on the keyboard and it shows by itself, even with the PC off. Before uploading you can set a frame-rate cap, brightness/contrast/gamma/invert, fit/zoom/position and trimming, with a live preview.
 - **Boot logo**: the keyboard shows a TENET 70 logo when it powers on. Put your own image there instead, or go back to the TENET 70 logo, from the Boot logo tab.
 - **Firmware**: installs **REVIVER**, our custom firmware for the TENET 70. It adds the image screen, a changeable boot logo, live drawing, tear-free scrolling and more. You can go back to the official firmware at any time.
+- **Lighting**: every key one colour, or all off (Lighting tab). Works on any firmware.
 - **Burn-in care**: the screen turns off while your PC sleeps or shuts down, or after you've been away for a while, and package screens shift by a pixel or two every few minutes.
 
 ## Install
