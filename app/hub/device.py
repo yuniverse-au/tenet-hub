@@ -76,7 +76,7 @@ class Keyboard:
                 r = bytes(self.dev.read(64, timeout_ms=left) or b"")
                 if not r:
                     return None
-                if r[8:10] == bytes([group, sub]):
+                if r[8] in (group, group ^ 0x80) and r[9] == sub:      # (reads come back either way)
                     return r[10:10 + r[4] - 2]
                 # an unrelated report (e.g. the keyboard talking to Hexcore Link): keep waiting
 
@@ -85,6 +85,17 @@ class Keyboard:
         the keyboard goes back to its own lighting when it powers on. -> True if accepted."""
         r = self.cmd(0x03, bytes([0xFF, 0x01] + [max(0, min(255, int(c))) for c in rgb]), group=0x20)
         return r is not None and r[:1] == b"\x00"
+
+    def brightness(self):
+        """Key light brightness 0-100 (stock A0 15), or None."""
+        r = self.cmd(0x15, group=0xA0)
+        return r[0] if r else None
+
+    def set_brightness(self, level):
+        """Stock 20 15: the keyboard saves it in its flash, so don't send it more than needed."""
+        level = max(0, min(100, int(level)))
+        r = self.cmd(0x15, bytes([level]), group=0x20)
+        return r is not None and len(r) >= 1
 
     # --- firmware identification ---------------------------------------------------------
     def probe(self):

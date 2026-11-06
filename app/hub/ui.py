@@ -498,6 +498,7 @@ class App:
             self.stat_label[s].set(f"label {names[s]}")
 
     def _stats_live(self):
+        self._brightness_live()
         if not hasattr(self, "stat_now"):
             return
         self._sensors_poll()
@@ -1038,7 +1039,41 @@ class App:
         self.light_msg = tk.StringVar()
         ttk.Label(box, textvariable=self.light_msg, foreground="#555", wraplength=800,
                   justify="left").pack(anchor="w", pady=(8, 0))
+        row = ttk.Frame(box)
+        row.pack(anchor="w", fill="x", pady=(10, 0))
+        ttk.Label(row, text="Brightness").pack(side="left")
+        self.light_bright = tk.IntVar(value=0)
+        self.light_bright_val = ttk.Label(row, width=6)
+        self.light_bright_scale = ttk.Scale(row, from_=0, to=100, length=300, variable=self.light_bright,
+                                            command=lambda x: self.light_bright_val.configure(
+                                                text=f"{int(float(x))}%"))
+        self.light_bright_scale.pack(side="left", padx=8)
+        self.light_bright_val.pack(side="left")
+        self.light_bright_scale.bind("<ButtonRelease-1>", lambda e: self._brightness_set())
+        self.light_bright_scale.bind("<KeyRelease>", lambda e: self._brightness_set())
+        self.light_bright_scale.state(["disabled"])
+        self._bright_touched = 0.0
+        ttk.Label(box, text="The keyboard keeps this itself (the Fn brightness keys change it too).",
+                  foreground="#555").pack(anchor="w", pady=(4, 0))
         self._lighting_show()
+
+    def _brightness_set(self):
+        self._bright_touched = time.time()
+        self.host.request_brightness(int(self.light_bright.get()))
+
+    def _brightness_live(self):
+        """Every second: follow the keyboard's brightness (unless the user just moved the slider)."""
+        if not hasattr(self, "light_bright_scale"):
+            return
+        b = self.host.brightness if self.host.kb is not None else None
+        if b is None:
+            self.light_bright_scale.state(["disabled"])
+            self.light_bright_val.configure(text="-")
+            return
+        self.light_bright_scale.state(["!disabled"])
+        if time.time() - self._bright_touched > 3 and int(self.light_bright.get()) != b:
+            self.light_bright.set(b)
+            self.light_bright_val.configure(text=f"{b}%")
 
     def _lighting_show(self):
         c = self.cfg.get("lighting_color") or "#FFFFFF"

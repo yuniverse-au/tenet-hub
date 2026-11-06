@@ -50,6 +50,7 @@ class Host:
         self._sent_list, self._sent_at = None, 0.0
         self._clock_at, self._clock_fmt = 0.0, None   # last clock sync; 12h flag sent this connection
         self.stats = pcstats.Sampler(cfg, log)           # PC stats screen (v24)
+        self.brightness, self._bright_at, self._bright_want = None, 0.0, None
         self._units_sent, self._stats_at, self._labels_sent = None, 0.0, {}
         self.running = {}                 # id -> Running
         self.problems = {}                # id -> why it isn't running
@@ -228,6 +229,7 @@ class Host:
         self._clock_at, self._clock_fmt = 0.0, None   # last clock sync; 12h flag sent this connection
         self._units_sent, self._stats_at, self._labels_sent = None, 0.0, {}
         self._lights_sent = None
+        self.brightness, self._bright_at = None, 0.0  # key lights 0-100, as the keyboard last said
         self.screen = Screen(kb, fw, self.cfg["contrast"]) if fw.at_least(1) else None
         if self.screen:
             self.screen.hold_off = self.asleep
@@ -283,6 +285,22 @@ class Host:
             except ValueError:
                 return (255, 255, 255)
         return None
+
+    def request_brightness(self, level):
+        """From the UI: set the key light brightness on the next tick."""
+        self._bright_want = max(0, min(100, int(level)))
+
+    def _sync_brightness(self):
+        want, self._bright_want = self._bright_want, None
+        if want is not None and want != self.brightness:
+            if self.kb.set_brightness(want):
+                self.brightness, self._bright_at = want, time.time()
+                self.log("key light brightness:", want)
+        elif time.time() - self._bright_at > 10:         # also catches Fn-key changes
+            self._bright_at = time.time()
+            b = self.kb.brightness()
+            if b is not None:
+                self.brightness = b
 
     def _sync_lighting(self):
         want = self.lighting_rgb()
@@ -345,6 +363,7 @@ class Host:
             self._sync_packages()
             self._sync_clock()
             self._sync_lighting()
+            self._sync_brightness()
             v21 = self._v21()
             while self._requests:
                 kind, value, pid = self._requests.pop(0)

@@ -29,6 +29,7 @@ class Board:
         self.stats_on = False            # mode 6 shows PC stats
         self.stats_labels = [b""] * 3    # v25 70 24 (b"" = the stock picture)
         self.lights = None               # stock 20 03 FF 01 r g b
+        self.brightness, self.brightness_writes = 80, 0     # stock 20 15 / A0 15
         self.time = None                 # 70 07 args (month, day, weekday, h, m, s)
         self.clock_12h = None
         self.settings_writes = 0
@@ -147,6 +148,11 @@ class Board:
             if cmd == b"\x20\x03" and len(args) == 5 and args[:2] == b"\xff\x01":   # stock: all keys one colour
                 self.lights = tuple(args[2:5])
                 return R(cmd, b"\x00")
+            if cmd == b"\x20\x15" and len(args) >= 1:                 # stock: set brightness (saved)
+                self.brightness, self.brightness_writes = min(100, args[0]), self.brightness_writes + 1
+                return R(cmd, bytes([self.brightness]))
+            if cmd == b"\xa0\x15":                                     # stock: read brightness
+                return R(cmd, bytes([self.brightness]))
             if cmd[0] != 0x70 or self.patch == 0:
                 return None
             sub = cmd[1]
