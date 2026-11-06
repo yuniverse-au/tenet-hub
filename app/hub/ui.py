@@ -152,6 +152,7 @@ class App:
         self._build_boot(nb)
         self._build_firmware(nb)
         self._build_settings(nb)
+        nb.bind("<<NotebookTabChanged>>", lambda e: self._tab_changed())
 
     # --- packages tab ---------------------------------------------------------------------
     def _build_packages(self, nb):
@@ -880,7 +881,14 @@ class App:
         f = ttk.Frame(nb, padding=8)
         nb.add(f, text="Firmware")
         self.fw_status = tk.StringVar()
-        ttk.Label(f, textvariable=self.fw_status, font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        head = ttk.Frame(f)
+        head.pack(fill="x")
+        ttk.Label(head, textvariable=self.fw_status, font=("Segoe UI", 10, "bold")).pack(side="left")
+        self.b_fw_check = ttk.Button(head, text="Check for updates", command=lambda: self.check_updates(manual=True))
+        self.b_fw_check.pack(side="right")
+        self.fw_upd_msg = tk.StringVar(value="")
+        self.fw_upd_label = ttk.Label(f, textvariable=self.fw_upd_msg, wraplength=820, justify="left")
+        self.fw_upd_label.pack(anchor="w", pady=(4, 0))
         cols = ("version", "notes")
         tv = ttk.Treeview(f, columns=cols, show="tree headings", height=6, selectmode="browse")
         tv.heading("#0", text="Firmware")
@@ -892,6 +900,7 @@ class App:
         tv.pack(fill="x", pady=6)
         tv.bind("<<TreeviewSelect>>", lambda e: self._fw_selected())
         self.fw_tv = tv
+        self.fw_tab = f
         self.fw_notes = tk.StringVar()
         ttk.Label(f, textvariable=self.fw_notes, wraplength=760, justify="left").pack(anchor="w", pady=(0, 6))
         bar = ttk.Frame(f)
@@ -919,6 +928,7 @@ class App:
 
     def refresh_firmware(self):
         tv = self.fw_tv
+        sel = tv.selection()
         tv.delete(*tv.get_children())
         for r in self.reg.firmware_releases():
             tv.insert("", "end", iid="fw:" + r["id"], text=r.get("name", r["id"]),
@@ -927,9 +937,49 @@ class App:
         tv.insert("", "end", iid="official", text=f"Official Hexcore firmware {o['version']}",
                   values=("-", "Removes REVIVER (packages that need it stop working)."))
         kids = tv.get_children()
-        if kids:
+        if sel and tv.exists(sel[0]):
+            tv.selection_set(sel[0])
+        elif kids:
             tv.selection_set(kids[0])
         self._fw_selected()
+        self._fw_update_text()
+
+    def _fw_update_text(self):
+        """The line under the list: is there newer firmware for this keyboard?"""
+        if not hasattr(self, "fw_upd_msg"):
+            return
+        if self.update_checking:
+            self.fw_upd_msg.set("Checking for updates...")
+            return
+        rel = self.reg.firmware_releases()
+        when = self._checked_text()
+        if self.reg.index_error and not rel:
+            self.fw_upd_msg.set(f"Couldn't check for updates: {self.reg.index_error}")
+            return
+        if not rel:
+            self.fw_upd_msg.set(f"No REVIVER releases found.{when}")
+            return
+        latest = rel[0]
+        name, n = latest.get("name", latest["id"]), latest.get("patch_version", 0)
+        fw = self.host.fw
+        if fw is None:
+            text = f"Latest: {name}. Connect the keyboard to compare."
+        elif fw.kind != "patch":
+            text = f"{name} is available (your keyboard has the official firmware)."
+        elif fw.at_least(n) and (fw.exact or fw.patch > n):
+            text = f"Your keyboard has the latest firmware ({fw})."
+        else:
+            text = f"Update available: {name}. Select it and click Install selected firmware."
+            if not getattr(self, "_fw_offered", None) == latest["id"]:   # select it once, not on every redraw
+                self._fw_offered = latest["id"]
+                if self.fw_tv.exists("fw:" + latest["id"]):
+                    self.fw_tv.selection_set("fw:" + latest["id"])
+        self.fw_upd_label.configure(foreground="#0a5" if text.startswith("Update available") else "")
+        self.fw_upd_msg.set(text + when)
+
+    def _checked_text(self):
+        t = self.cfg.get("last_check") or 0
+        return f"  Last checked {time.strftime('%H:%M', time.localtime(t))}." if t else ""
 
     def _fw_selected(self):
         s = self.fw_tv.selection()
@@ -1015,7 +1065,6 @@ class App:
             self.vars[key] = v
             ttk.Checkbutton(f, text=label, variable=v, command=self.save_settings).pack(anchor="w", pady=2)
         check("start_at_login", "Start TENET Hub when I log in")
-        check("check_updates", "Check GitHub for new packages and updates")
         check("auto_update_packages", "Update packages automatically (firmware is never updated without asking)")
         check("off_when_pc_sleeps", "Turn the keyboard screen off when the PC sleeps or shuts down")
         check("off_with_monitor", "...and when Windows turns the monitor off")
@@ -1034,6 +1083,21 @@ class App:
         ttk.Scale(row, from_=8, to=255, length=220, variable=self.contrast_var,
                   command=lambda v: None).pack(side="left", padx=6)
         ttk.Button(row, text="Apply", command=self.save_settings).pack(side="left")
+        box = ttk.LabelFrame(f, text="Updates", padding=8)
+        box.pack(fill="x", pady=(10, 0))
+        top = ttk.Frame(box)
+        top.pack(fill="x")
+        ttk.Label(top, text=f"{APP_NAME} {VERSION}", font=("Segoe UI", 10, "bold")).pack(side="left")
+        self.b_hub_check = ttk.Button(top, text="Check for updates", command=lambda: self.check_updates(manual=True))
+        self.b_hub_check.pack(side="right")
+        self.b_hub_download = ttk.Button(top, text="Download", command=self._open_hub_release)
+        self.hub_upd_msg = tk.StringVar(value="")
+        ttk.Label(box, textvariable=self.hub_upd_msg).pack(anchor="w", pady=(4, 0))
+        v = tk.BooleanVar(value=bool(self.cfg["check_updates"]))
+        self.vars["check_updates"] = v
+        ttk.Checkbutton(box, text="Check GitHub for new packages and updates automatically", variable=v,
+                        command=self.save_settings).pack(anchor="w", pady=(4, 0))
+        self._hub_update_text()
         row = ttk.Frame(f)
         row.pack(fill="x", pady=10)
         ttk.Label(row, text="Catalogue (index.json) URL:").pack(anchor="w")
@@ -1044,7 +1108,6 @@ class App:
         ttk.Button(bar, text="Save", command=self.save_settings).pack(side="left")
         ttk.Button(bar, text="Open log", command=lambda: self._open(self.log_path)).pack(side="left", padx=6)
         ttk.Button(bar, text="Quit TENET Hub", command=self.quit).pack(side="right")
-        ttk.Label(f, text=f"{APP_NAME} {VERSION}", foreground="#777").pack(anchor="w", side="bottom")
 
     def save_settings(self):
         for k, v in self.vars.items():
@@ -1075,14 +1138,67 @@ class App:
             self.check_updates()
 
     # --- updates ----------------------------------------------------------------------------
-    def check_updates(self, quiet=False):
+    update_checking = False
+
+    def check_updates(self, quiet=False, manual=False):
+        """quiet: no error box. manual: from a "Check for updates" button (shows the result)."""
+        if self.update_checking:
+            return
+        self.update_checking = True
+        self._check_started = time.time()
+        for b in ("b_hub_check", "b_fw_check"):
+            if hasattr(self, b):
+                getattr(self, b).configure(state="disabled")
+        self._hub_update_text()
+        self._fw_update_text()
+
         def done(r, err):
+            self.update_checking = False
+            for b in ("b_hub_check", "b_fw_check"):
+                if hasattr(self, b):
+                    getattr(self, b).configure(state="normal")
             self.refresh_packages()
             self.refresh_firmware()
             self._hub_banner()
-            if not quiet and self.reg.index_error:
-                messagebox.showwarning(APP_NAME, f"Couldn't check for updates:\n{self.reg.index_error}")
+            self._hub_update_text()
+            err = err or self.reg.index_error
+            if err and not quiet:
+                messagebox.showwarning(APP_NAME, f"Couldn't check for updates:\n{err}")
         self._thread(self._do_check, done)
+
+    def _hub_update_text(self):
+        if not hasattr(self, "hub_upd_msg"):
+            return
+        if self.update_checking:
+            self.hub_upd_msg.set("Checking for updates...")
+            self.b_hub_download.pack_forget()
+            return
+        h = self.reg.hub_update()
+        if h:
+            self.hub_upd_msg.set(f"TENET Hub {h['version']} is available.{self._checked_text()}")
+            self.b_hub_download.configure(text=f"Download {h['version']}")
+            self.b_hub_download.pack(side="right", padx=6)
+        else:
+            self.b_hub_download.pack_forget()
+            if self.reg.index_error:
+                self.hub_upd_msg.set(f"Couldn't check for updates: {self.reg.index_error}")
+            elif self.reg.index:
+                self.hub_upd_msg.set(f"You have the latest version.{self._checked_text()}")
+            else:
+                self.hub_upd_msg.set("Not checked yet.")
+
+    FW_RECHECK_SEC = 60                  # switching to the Firmware tab checks again after this long
+
+    def _tab_changed(self):
+        try:
+            on_fw = self.nb.nametowidget(self.nb.select()) is self.fw_tab
+        except Exception:
+            return
+        if on_fw:
+            self._fw_update_text()
+            last = max(self.cfg.get("last_check") or 0, getattr(self, "_check_started", 0))
+            if time.time() - last > self.FW_RECHECK_SEC and not self.busy:
+                self.check_updates(quiet=True)
 
     def _do_check(self):
         new, upd = self.reg.refresh()

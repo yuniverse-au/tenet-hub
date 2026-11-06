@@ -42,7 +42,10 @@ def shot(name):
     ImageGrab.grab(bbox=(x, y, x + w, y + h), xdisplay=os.environ["DISPLAY"]).save(os.path.join(OUT, name))
 
 
-def step(i=0):
+CHECKS = []
+
+
+def step(i=0, *extra):
     tabs = app.nb.tabs()
     if i == 0:
         app.refresh_packages()
@@ -60,7 +63,30 @@ def step(i=0):
         app.pkg_tv.selection_set("nowplaying")
         app.pkg_settings()
         app.root.after(700, lambda: (shot_dialog(), app.root.after(100, step, i + 1)))
+    elif i == len(tabs) + 1:
+        # switching to the Firmware tab checks for updates (here: a newer Hub and v21 for a v20 keyboard)
+        from hub.device import FirmwareInfo
+        orig = app.reg.refresh
+        def refresh():
+            CHECKS.append(1)
+            r = orig()
+            app.reg.index["hub"]["version"] = "9.9.9"
+            return r
+        app.reg.refresh = refresh
+        app.cfg.data["last_check"] = 0
+        app._check_started = 0
+        host.fw = FirmwareInfo("patch", 20, True)
+        app.nb.select(tabs[0])
+        app.root.update()
+        app.nb.select(next(t for t in tabs if app.nb.tab(t, "text") == "Firmware"))
+        app.root.after(2500, lambda: (shot("firmware_update.png"), step(i + 1)))
+    elif i == len(tabs) + 2:
+        fwmsg = app.fw_upd_msg.get()
+        app.nb.select(next(t for t in tabs if app.nb.tab(t, "text") == "Settings"))
+        app.root.after(800, lambda: (shot("settings_update.png"), step(i + 1, fwmsg)))
     else:
+        print("auto check on switching to Firmware:", len(CHECKS), "| firmware:", extra[0])
+        print("settings:", app.hub_upd_msg.get(), "| download button:", app.b_hub_download.winfo_ismapped())
         print("running:", sorted(host.running), "problems:", host.problems, "status:", host.status)
         app.quit()
 

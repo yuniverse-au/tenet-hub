@@ -34,6 +34,9 @@ How many frames fit depends on the keyboard's flash chip (about 190 on a 1 MB ch
 
 The boot logo has its own 8 KB of the keyboard's flash chip, so it never uses image screen frames. It needs REVIVER v20 or newer.
 
+### Updates
+TENET Hub checks GitHub for new packages, firmware and TENET Hub versions every few hours (Settings → *Check GitHub for new packages and updates automatically*). Opening the **Firmware** tab checks again and tells you if a newer REVIVER is available for your keyboard. Both the Firmware and Settings tabs also have a *Check for updates* button. Packages can update themselves; firmware never installs without you clicking Install.
+
 ### If something goes wrong
 Unplug the keyboard, **hold Esc while plugging it back in** (it starts in update mode), then install the official firmware from the Firmware tab. Typing keeps working on every REVIVER version.
 
