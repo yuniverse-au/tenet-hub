@@ -21,22 +21,22 @@
   ],
   "firmware": [
     {
-      "name": "REVIVER v21",
-      "patch_version": 21,
-      "notes": "Your screen list: choose which screens the screen button goes through and in what order, from the Screens tab (KPM, clock and the Hexcore Link logo can come back if you want them). Every screen package gets a screen of its own; package screens only come up while TENET Hub is running. Keeps everything from v20: changeable boot logo (TENET 70 by default), the image screen for images and GIFs stored on the keyboard, live drawing, tear-free scrolling, screen-off support.",
+      "name": "REVIVER v22",
+      "patch_version": 22,
+      "notes": "Fixes screens you turned on (like the clock) not showing up when you press the screen button: v21 only loaded your screen list when the boot animation ran. Everything from v21: your own screen list (Screens tab), a screen for every screen package, changeable boot logo, the image screen, live drawing, tear-free scrolling, screen-off support.",
       "base": {
         "version": "3.0.7",
         "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
         "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
         "size": 86620
       },
-      "id": "v21",
+      "id": "v22",
       "patch": {
-        "url": "firmware/v21/patch.json",
-        "sha256": "6D130491474063D43C374D108A7ABA7BC85F45362FF49A0EC595FD5AFC164A64"
+        "url": "firmware/v22/patch.json",
+        "sha256": "3693BFF7A5ABA4D5573058CFAB34EF2BE0E6213AF9DE6B4781FE73A5BD52D697"
       },
-      "result_sha256": "2E7BBCD804E549C1F262BEE839639D57BD9A6D338D513B5FEFCBC3528C24E73D",
-      "result_size": 92436,
+      "result_sha256": "4A147754A9776B40E4253FB4090934EFEFBB902CF0E481782244350CB4DF2616",
+      "result_size": 92448,
       "base_sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56"
     }
   ]

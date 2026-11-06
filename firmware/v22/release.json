@@ -1,0 +1,11 @@
+{
+  "name": "REVIVER v22",
+  "patch_version": 22,
+  "notes": "Fixes screens you turned on (like the clock) not showing up when you press the screen button: v21 only loaded your screen list when the boot animation ran. Everything from v21: your own screen list (Screens tab), a screen for every screen package, changeable boot logo, the image screen, live drawing, tear-free scrolling, screen-off support.",
+  "base": {
+    "version": "3.0.7",
+    "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
+    "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
+    "size": 86620
+  }
+}

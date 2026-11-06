@@ -1,4 +1,4 @@
-"""A fake TENET 70 for tests: speaks the vendor protocol (REVIVER v21) and the IAP protocol.
+"""A fake TENET 70 for tests: speaks the vendor protocol (REVIVER v22) and the IAP protocol.
 Install with sys.modules['hid'] = fake_hid. Records everything and flags pipelined packets."""
 import struct, threading, time
 
@@ -6,7 +6,7 @@ VID, PID = 0x3311, 0xF005
 
 
 class Board:
-    def __init__(self, patch=21):
+    def __init__(self, patch=22):
         self.patch = patch
         self.state = "app"          # "app" | "iap" | "gone"
         self.mode = 5

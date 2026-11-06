@@ -47,7 +47,7 @@ class Host:
         self.status = "Starting..."
         self.mode = None
         self.slots, self.want = {}, None             # v21: package id -> screen code; list to keep
-        self._sent_list = None
+        self._sent_list, self._sent_at = None, 0.0
         self.running = {}                 # id -> Running
         self.problems = {}                # id -> why it isn't running
         self.paused = threading.Event()   # set while flashing: the host lets go of the keyboard
@@ -214,7 +214,7 @@ class Host:
         kb = Keyboard(path)
         fw = kb.probe()
         self.kb, self.fw = kb, fw
-        self._sent_list = None
+        self._sent_list, self._sent_at = None, 0.0
         self.screen = Screen(kb, fw, self.cfg["contrast"]) if fw.at_least(1) else None
         if self.screen:
             self.screen.hold_off = self.asleep
@@ -270,10 +270,15 @@ class Host:
                 if st is None:
                     raise IOError("no reply")
                 _, mode, _, on_kb = st                             # mode = screen code (0x80+k = package)
-                if self.want and on_kb != self.want and self._sent_list != self.want:
-                    self._sent_list = list(self.want)
+                # keep the keyboard's list in step with ours: send it whenever it differs (the
+                # keyboard may have lost it, e.g. v21 without a boot animation), at most every 3 s
+                now = time.time()
+                if self.want and on_kb != self.want and (self._sent_list != self.want or now - self._sent_at > 3):
+                    self._sent_list, self._sent_at = list(self.want), now
                     if self.kb.set_screens(self.want):
                         self.log("screen list sent:", [hex(x) for x in self.want])
+                    else:
+                        self.log("the keyboard refused the screen list:", [hex(x) for x in self.want])
             if self.asleep or self.screen is None:
                 return 0.5
             if not v21:
