@@ -222,10 +222,22 @@ for _ in range(15):
     host._tick()
     time.sleep(0.05)
 np_img = host.running["nowplaying"].obj.frame(time.time())
-crisp = 16
+crisp = host.running["nowplaying"].obj.crisp_rows
 want = screen.to_4bpp(np_img)
 check("mode 5: Now Playing drawn ('Nothing playing' here: no media on Linux)",
       bytes(B.screen)[:(32 - crisp) * 128] == want[:(32 - crisp) * 128] and "700b" in B.cmds)
+# a package switching its tear-free rows on and off: every switch redraws those rows
+from PIL import ImageDraw
+sw = screen.Screen(host.kb, host.fw)
+a = Image.new("L", (256, 32)); ImageDraw.Draw(a).rectangle((20, 2, 120, 12), fill=255)
+b = Image.new("L", (256, 32)); ImageDraw.Draw(b).rectangle((20, 9, 120, 22), fill=90)
+sent = []
+for img, rows in ((a, 16), (b, 0), (a, 16), (b, 0)):
+    n0, c0 = B.cmds.count("700b"), B.cmds.count("7011")
+    sw.show(img, rows)
+    sent.append((B.cmds.count("700b") - n0, B.cmds.count("7011") - c0))
+check(f"crisp rows switched on/off: redrawn every time {sent}",
+      sent[2][1] == 1 and sent[3][0] > 0 and bytes(B.screen)[:4096] == screen.to_4bpp(b))
 B.mode = 6
 host._tick()
 n = len(B.cmds)

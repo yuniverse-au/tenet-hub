@@ -23,11 +23,13 @@ def to_4bpp(img):
 
 
 class Screen:
+    CAN_SWITCH_CRISP = True       # packages may change crisp_rows from one frame to the next
     def __init__(self, kb, fw, contrast=0x3D, i2c_speed=2.0):
         self.kb, self.fw = kb, fw
         self.contrast = contrast
         self.last = [None] * 128
         self.last_band = None
+        self.last_crisp = None
         self.is_on = True
         self.hold_off = False         # PC asleep: nothing may switch the screen on
         self.can_raw = fw.at_least(2)
@@ -79,6 +81,9 @@ class Screen:
             self.forget()
         crisp_rows = crisp_rows if self.can_band else 0
         crisp_rows = min(26, max(0, crisp_rows)) & ~3          # whole 32-byte rows of chunks
+        if crisp_rows != self.last_crisp:                     # those rows switch between the band and
+            self.forget()                                     # normal drawing: send everything again
+            self.last_crisp = crisp_rows
         skip = range((32 - crisp_rows) * 4, 128) if crisp_rows else range(0)
         if crisp_rows and not self._send_band(img, crisp_rows):
             self.forget()

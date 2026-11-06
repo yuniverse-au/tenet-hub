@@ -4,6 +4,10 @@ import asyncio, datetime, threading, time
 from PIL import Image, ImageDraw
 
 from hub import api, render
+from hub.screen import Screen
+
+# TENET Hub 1.1.1+ lets a package switch its tear-free rows on and off between frames
+SWITCH_CRISP = getattr(Screen, "CAN_SWITCH_CRISP", False)
 
 W, H = api.WIDTH, api.HEIGHT
 X0 = 20                       # text starts right of the music note
@@ -171,6 +175,8 @@ class Package(api.ScreenPackage):
         if self.spec and self.spec.error and not self.spec_reported:
             self.ctx.log("spectrum off:", self.spec.error)
             self.spec_reported = True
+        # nothing playing: no tear-free rows (they're 1 bit, so the dim grey text would lose its top)
+        self.crisp_rows = 0 if (not info and SWITCH_CRISP) else BAND_ROWS
         img, scrolling = self.render(info, pos, offset, self.spec.bars if spec_on else None, spec_on)
         playing = bool(info and info.get("playing"))
         self.fps = s.get("spectrum_fps", 12) if (spec_on and playing) else \
@@ -202,7 +208,8 @@ class Package(api.ScreenPackage):
         d.line((9, 22, 9, 4), fill=255, width=2)
         d.line((9, 4, 15, 7), fill=255, width=2)
         if not info:
-            d.text((X0, 8), "Nothing playing", font=self.title_font, fill=90)
+            # centred when the whole screen is greyscale; otherwise below the 1-bit tear-free rows
+            d.text((X0, 5 if SWITCH_CRISP else BAND_ROWS - 4), "Nothing playing", font=self.title_font, fill=90)
             return img, False
         title, artist = info["track"]
         scrolling = self.draw_title(img, title, offset, spec_on)
