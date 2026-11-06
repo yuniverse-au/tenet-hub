@@ -6,7 +6,7 @@ where py >nul 2>nul && (set "PY=py") || (set "PY=python")
 %PY% -m PyInstaller --noconfirm --onefile --noconsole --name TenetHub ^
   --paths app --add-data "packages;packages" ^
   --collect-all winrt --collect-all soundcard --collect-submodules pystray ^
-  --hidden-import hub._bundle ^
+  --hidden-import hub._bundle --collect-submodules hub ^
   app\tenet_hub.py || goto :fail
 echo.
 echo Built dist\TenetHub.exe

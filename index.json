@@ -21,22 +21,22 @@
   ],
   "firmware": [
     {
-      "name": "REVIVER v14",
-      "patch_version": 14,
-      "notes": "GIF screen: store an animation on the keyboard and it plays by itself, even with the PC off (replaces the Monitor screen; upload from the GIF screen tab). Live drawing for packages, tear-free scrolling, Yuniverse boot logo, screen button skips KPM and clock, blank Custom Text screen for Now Playing, screen-off support, patch version reporting.",
+      "name": "REVIVER v15",
+      "patch_version": 15,
+      "notes": "GIF screen: store an animation on the keyboard and it plays by itself, even with the PC off (replaces the Monitor screen; upload from the GIF screen tab). Fixes a crash when switching to the GIF screen from the app, and makes all of REVIVER's flash-chip access safe alongside the firmware's own. Also: live drawing for packages, tear-free scrolling, Yuniverse boot logo, screen button skips KPM and clock, blank Custom Text screen for Now Playing, screen-off support.",
       "base": {
         "version": "3.0.7",
         "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
         "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
         "size": 86620
       },
-      "id": "v14",
+      "id": "v15",
       "patch": {
-        "url": "firmware/v14/patch.json",
-        "sha256": "8091616DB609F082C560CDBE9CE5F1F8073447FF7DFE36981ABB033EF1C5EFD7"
+        "url": "firmware/v15/patch.json",
+        "sha256": "93D7AC759EB9E73CA424C7396E2E68166AC26F5A554493AB8E2244340DD97159"
       },
-      "result_sha256": "560164F8C42C59631385CA0DEDCEBFEFF6B5F6F8F3BB05F3BD04A16ECDE942A0",
-      "result_size": 90856,
+      "result_sha256": "A1F98B494FE5C56828AC83D57A38B8174A8311A45F6C1F3453A5B7E69431B5C0",
+      "result_size": 91256,
       "base_sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56"
     }
   ]

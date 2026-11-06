@@ -371,7 +371,7 @@ class App:
         bar.pack(fill="x", pady=(10, 2))
         self.b_gif_upload = ttk.Button(bar, text="Put it on the keyboard", command=self.gif_upload)
         self.b_gif_upload.pack(side="left")
-        ttk.Button(bar, text="Show the GIF screen", command=lambda: self.host._request("mode", 6)).pack(side="left", padx=6)
+        ttk.Button(bar, text="Show the GIF screen", command=self.gif_show).pack(side="left", padx=6)
         ttk.Button(bar, text="Remove from keyboard", command=self.gif_clear).pack(side="left")
         self.gif_progress = ttk.Progressbar(f, mode="determinate", maximum=1.0)
         self.gif_progress.pack(fill="x", pady=(6, 0))
@@ -514,6 +514,11 @@ class App:
     def gif_upload(self):
         if not self.gif_frames or self.busy:
             return
+        fw = self.host.fw
+        if fw and not fw.at_least(gif.MIN_PATCH):
+            messagebox.showinfo(APP_NAME, f"The GIF screen needs REVIVER v{gif.MIN_PATCH} or newer. "
+                                          "Install it from the Firmware tab first.")
+            return
         frames, burst = list(self.gif_frames), self.gif_settings()["burst"]
         self.b_gif_upload.configure(state="disabled")
 
@@ -534,6 +539,13 @@ class App:
                 self.gif_kbinfo = inf
                 self.gif_msg.set(f"Stored {inf['frames']} frames. It plays on the GIF screen, even with the PC off.")
         self._with_keyboard(fn, done)
+
+    def gif_show(self):
+        fw = self.host.fw
+        if not (fw and fw.at_least(gif.MIN_PATCH)):
+            messagebox.showinfo(APP_NAME, f"The GIF screen needs REVIVER v{gif.MIN_PATCH} or newer (Firmware tab).")
+            return
+        self.host._request("mode", 6)
 
     def gif_clear(self):
         if self.busy or not messagebox.askyesno(APP_NAME, "Remove the animation stored on the keyboard?"):

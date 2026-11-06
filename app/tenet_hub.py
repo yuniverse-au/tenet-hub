@@ -42,7 +42,25 @@ def bundled_packages_dir():
     return os.path.join(base, "packages")
 
 
+def selftest():
+    """For CI: run inside the built .exe and load every bundled package the way the app does."""
+    import tempfile
+    os.environ["LOCALAPPDATA"] = tempfile.mkdtemp()
+    from hub import api, render, gif, ui  # noqa: F401
+    cfg = Config()
+    reg = Registry(cfg, print)
+    reg.bundled(bundled_packages_dir())
+    assert reg.installed, "no bundled packages found"
+    for m in reg.installed.values():
+        if m["type"] != "animation":
+            cls = reg.load_class(m)
+            assert issubclass(cls, (api.ScreenPackage, api.BackgroundPackage)), m["id"]
+    open(os.path.join(os.getcwd(), "selftest.ok"), "w").write(", ".join(sorted(reg.installed)))
+
+
 def main():
+    if "--selftest" in sys.argv:
+        return selftest()
     log, log_path = make_logger()
     if not power.single_instance("TenetHub"):
         log("already running")

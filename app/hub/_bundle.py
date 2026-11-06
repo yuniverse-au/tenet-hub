@@ -11,6 +11,7 @@ import io, itertools, json, locale, math, operator, pathlib, queue, random, re, 
 import shutil, socket, sqlite3, ssl, statistics, string, struct, subprocess, tempfile, textwrap  # noqa
 import threading, time, typing, unicodedata, urllib.parse, urllib.request, uuid, xml.etree.ElementTree  # noqa
 import zipfile, zoneinfo  # noqa
+from . import api, render  # noqa: F401  (packages import these: keep them in the .exe)
 try:
     import numpy  # noqa
 except ImportError:

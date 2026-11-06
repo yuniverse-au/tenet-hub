@@ -1,4 +1,4 @@
-"""The keyboard's GIF screen (screen 6, REVIVER v14+).
+"""The keyboard's GIF screen (screen 6, REVIVER v15+).
 
 The animation is stored on the keyboard's flash chip and the firmware plays it by itself, even
 with the PC off. This module turns any GIF into keyboard frames (with the user's adjustments) and
@@ -18,7 +18,7 @@ from .screen import to_4bpp
 W, H = 256, 32
 MAGIC = b"TGIF"
 FRAME_BYTES = 4096
-MIN_PATCH = 14
+MIN_PATCH = 15         # v14 crashed when the app switched to the GIF screen
 
 DEFAULTS = {
     "fps_cap": 12,          # never faster than this (lower it if playback stutters)

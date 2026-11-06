@@ -245,7 +245,7 @@ class Host:
             self._sync_packages()
             while self._requests:
                 kind, value = self._requests.pop(0)
-                if kind == "mode" and self.fw.at_least(6) and value in range(1, 8):
+                if kind == "mode" and self.fw.at_least(15) and value in range(1, 8):   # v15: safe from the app
                     self.kb.set_mode(value)
             if self.asleep or self.screen is None:
                 return 0.5
