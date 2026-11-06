@@ -89,6 +89,65 @@ except ValueError as e:
     check(f"tampered package refused ({e})", "checksum" in str(e))
 open(z, "wb").write(good)
 
+# --- community packages: someone else's repo, added by link ----------------------------------------
+from hub import packages as pk
+check("repo link -> index.json URL",
+      pk.source_url("github.com/alice/tenet-pkgs") == "https://raw.githubusercontent.com/alice/tenet-pkgs/HEAD/index.json"
+      and pk.source_url("https://github.com/alice/tenet-pkgs/tree/dev/sub/") ==
+      "https://raw.githubusercontent.com/alice/tenet-pkgs/dev/sub/index.json"
+      and pk.source_url("https://example.com/x/index.json") == "https://example.com/x/index.json"
+      and pk.source_label("https://raw.githubusercontent.com/alice/tenet-pkgs/HEAD/index.json") == "alice/tenet-pkgs")
+
+
+def community_repo(name, pkgs):
+    """pkgs: {id: version}. A community repo inside the served folder, built with --community."""
+    root = os.path.join(REPO, name)
+    for pid, ver in pkgs.items():
+        d = os.path.join(root, "packages", pid)
+        os.makedirs(d, exist_ok=True)
+        json.dump({"id": pid, "name": pid.title(), "version": ver, "type": "screen", "author": name,
+                   "requires_firmware": 1, "description": "community test"}, open(os.path.join(d, "package.json"), "w"))
+        open(os.path.join(d, "main.py"), "w").write(
+            "from hub import api\nclass Package(api.ScreenPackage):\n    def frame(self, now):\n        return None\n")
+    os.system(f'cd {REPO} && {sys.executable} tools/build_index.py --community --root "{root}" --name "{name}" >/dev/null')
+    return f"http://127.0.0.1:{srv.server_port}/{name}/index.json"
+
+alice = community_repo("alice", {"alice-clock": "1.0.0", "nowplaying": "50.0.0"})
+cidx = json.load(open(os.path.join(REPO, "alice", "index.json")))
+check("community catalogue has no firmware / hub entries", "firmware" not in cidx and "hub" not in cidx
+      and cidx["name"] == "alice")
+fw_before = [f["id"] for f in reg.firmware_releases()]
+url, _ = reg.add_source(alice)
+check(f"source added: {pk.source_label(url)}", url == alice and alice in cfg["community_sources"])
+av = reg.available()
+check("its package is listed, tagged with the source", av.get("alice-clock", {}).get("_source") == alice)
+check("it can't take an official package's id", av["nowplaying"].get("_source") is None
+      and "nowplaying" not in reg.from_source(alice))
+check("community sources can't offer firmware", [f["id"] for f in reg.firmware_releases()] == fw_before)
+m = reg.install("alice-clock")
+check("installed from the community source; the source is remembered",
+      m["version"] == "1.0.0" and reg.source_of("alice-clock") == alice and reg.is_community("alice-clock"))
+community_repo("alice", {"alice-clock": "1.1.0"})
+reg.refresh()
+check(f"community update found but not automatic: updatable={reg.updatable()} auto={reg.auto_updatable()}",
+      "alice-clock" in reg.updatable() and "alice-clock" not in reg.auto_updatable())
+mallory = community_repo("mallory", {"alice-clock": "9.9.9"})
+reg.add_source(mallory)
+check("another source can't update or replace it",
+      reg.available()["alice-clock"]["_source"] == alice and reg.available()["alice-clock"]["version"] == "1.1.0")
+reg.install("alice-clock")
+check("the user's update installs from its own source", reg.installed["alice-clock"]["version"] == "1.1.0")
+reg.remove_source(alice)
+check("removing a source keeps its packages, without updates",
+      "alice-clock" in reg.installed and "alice-clock" not in reg.available() and alice not in reg.sources())
+try:
+    reg.install("alice-clock")                         # now only mallory offers that id
+    check("a package from another source isn't installed over it", False)
+except ValueError as e:
+    check(f"a package from another source isn't installed over it ({e})", ("somewhere else" in str(e) or "catalogue" in str(e)) and reg.installed["alice-clock"]["version"] == "1.1.0")
+reg.remove("alice-clock"); reg.remove_source(mallory)
+check("removed: source forgotten", reg.source_of("alice-clock") is None and not reg.sources())
+
 # a zip that tries to write outside its folder is refused
 evil = io.BytesIO()
 with zipfile.ZipFile(evil, "w") as zf:

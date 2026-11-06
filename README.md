@@ -2,7 +2,7 @@
 
 Firmware updates and screen packages for the **Metakey TENET 70** keyboard (Hexcore PCB) and its 256×32 OLED screen.
 
-- **Packages** draw live content on the keyboard's screen, like the song that's playing. Background packages can also react to PC events. New packages and updates are found automatically from this repository.
+- **Packages** draw live content on the keyboard's screen, like the song that's playing. Background packages can also react to PC events. Official packages and their updates come from this repository; **community packages** come from other people's GitHub repos that you add (Packages tab → *Community sources…*). Making your own: [docs/community-packages.md](docs/community-packages.md).
 - **Screens**: turn the keyboard's built-in screens on or off, put them in any order, and give every screen package a screen of its own.
 - **Image screen**: store an image or an animation on the keyboard and it shows by itself, even with the PC off. Before uploading you can set a frame-rate cap, brightness/contrast/gamma/invert, fit/zoom/position and trimming, with a live preview.
 - **Boot logo**: the keyboard shows a TENET 70 logo when it powers on. Put your own image there instead, or go back to the TENET 70 logo, from the Boot logo tab.
@@ -43,7 +43,7 @@ How many frames fit depends on the keyboard's flash chip (about 190 on a 1 MB ch
 The boot logo has its own 8 KB of the keyboard's flash chip, so it never uses image screen frames. It needs REVIVER v20 or newer.
 
 ### Updates
-TENET Hub checks GitHub for new packages, firmware and TENET Hub versions every few hours (Settings → *Check GitHub for new packages and updates automatically*). Opening the **Firmware** tab checks again and tells you if a newer REVIVER is available for your keyboard. Both the Firmware and Settings tabs also have a *Check for updates* button. Packages can update themselves; firmware never installs without you clicking Install.
+TENET Hub checks GitHub for new packages, firmware and TENET Hub versions every few hours (Settings → *Check GitHub for new packages and updates automatically*). Opening the **Firmware** tab checks again and tells you if a newer REVIVER is available for your keyboard. Both the Firmware and Settings tabs also have a *Check for updates* button. Official packages can update themselves; community packages update when you click Update; firmware never installs without you clicking Install.
 
 ### If something goes wrong
 Unplug the keyboard, **hold Esc while plugging it back in** (it starts in update mode), then install the official firmware from the Firmware tab. Typing keeps working on every REVIVER version.
@@ -65,6 +65,7 @@ REVIVER is built on top of Hexcore's official 3.0.7 firmware, and this repositor
 | `tools/` | `build_index.py`, `make_patch.py` |
 | `tests/` | a fake keyboard and end-to-end tests |
 | `docs/packages.md` | how to write a package |
+| `docs/community-packages.md` | how to publish packages from your own repo |
 
 ## Publishing
 - **Package change:** bump `version` in its `package.json`, run `python tools/build_index.py`, then commit and push. Users get it on their next check (every 6 hours, or *Check for updates*).

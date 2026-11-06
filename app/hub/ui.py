@@ -5,7 +5,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageDraw
 
-from . import APP_NAME, VERSION, api, bootlogo, firmware, flasher, gif, screens, sensors, stats as pcstats
+from . import APP_NAME, VERSION, api, bootlogo, firmware, flasher, gif, packages, screens, sensors, stats as pcstats
 from .device import Keyboard, enumerate_keyboards
 from .config import data_dir, set_start_at_login
 
@@ -161,10 +161,10 @@ class App:
     def _build_packages(self, nb):
         f = ttk.Frame(nb, padding=8)
         nb.add(f, text="Packages")
-        cols = ("installed", "latest", "screen", "status")
+        cols = ("source", "installed", "latest", "screen", "status")
         tv = ttk.Treeview(f, columns=cols, show="tree headings", height=9, selectmode="browse")
         tv.heading("#0", text="Package")
-        for c, w, label in zip(cols, (80, 80, 150, 260), ("Installed", "Latest", "Screen", "Status")):
+        for c, w, label in zip(cols, (130, 70, 70, 130, 230), ("Source", "Installed", "Latest", "Screen", "Status")):
             tv.heading(c, text=label)
             tv.column(c, width=w, anchor="w")
         tv.column("#0", width=180)
@@ -182,6 +182,7 @@ class App:
         for b in (self.b_install, self.b_toggle, self.b_settings, self.b_remove):
             b.pack(side="left", padx=(0, 6))
         ttk.Button(bar, text="Check for updates", command=self.check_updates).pack(side="right")
+        ttk.Button(bar, text="Community sources...", command=lambda: CommunitySources(self)).pack(side="right", padx=(6, 0))
         ttk.Button(bar, text="Open packages folder",
                    command=lambda: self._open(self.reg.root)).pack(side="right", padx=6)
         self.pkg_info = tk.Text(f, height=8, wrap="word", relief="flat", background=self.root.cget("bg"))
@@ -222,14 +223,18 @@ class App:
             if pid in upd:
                 status += "  (update available)"
                 tag = tag or "new"
-            yield pid, info.get("name", pid), m["version"] if m else "", a["version"] if a else "", screen, status, tag
+            src = self.reg.source_of(pid) if m else (a or {}).get("_source")
+            source = packages.source_label(src) if src else (
+                "Official" if a or pid in self.reg.official() or pid in self.reg.bundled_ids else "Local")
+            yield pid, info.get("name", pid), source, m["version"] if m else "", a["version"] if a else "", screen, status, tag
 
     def refresh_packages(self):
         tv = self.pkg_tv
         sel = tv.selection()
         tv.delete(*tv.get_children())
-        for pid, name, iv, av, screen, status, tag in self._pkg_rows():
-            tv.insert("", "end", iid=pid, text=name, values=(iv, av, screen, status), tags=(tag,) if tag else ())
+        for pid, name, source, iv, av, screen, status, tag in self._pkg_rows():
+            tv.insert("", "end", iid=pid, text=name, values=(source, iv, av, screen, status),
+                      tags=(tag,) if tag else ())
         if sel and tv.exists(sel[0]):
             tv.selection_set(sel[0])
         self._pkg_selected()
@@ -259,6 +264,10 @@ class App:
                          + (f"  by {info['author']}" if info.get("author") else ""))
             lines.append("")
             lines.append(info.get("description", ""))
+            src = self.reg.source_of(pid) if m else (a or {}).get("_source")
+            if src:
+                lines += ["", f"Community package from {packages.source_page(src)} - not made or checked by "
+                              "TENET Hub. Updates install when you click Update."]
             need = int(info.get("requires_firmware") or 0)
             if need:
                 lines.append("")
@@ -276,8 +285,15 @@ class App:
         pid = self._sel()
         if not pid:
             return
-        name = (self.reg.available().get(pid) or {}).get("name", pid)
+        entry = self.reg.available().get(pid) or {}
+        name = entry.get("name", pid)
         first = pid not in self.reg.installed
+        if entry.get("_source") and not messagebox.askyesno(
+                APP_NAME, f"{'Install' if first else 'Update'} {name} from {packages.source_page(entry['_source'])}?\n\n"
+                          "This is a community package. It runs as a program on your PC with your permissions, "
+                          "and TENET Hub hasn't checked it. Only install packages from people you trust.",
+                icon="warning"):
+            return
 
         def done(m, err):
             if err:
@@ -1335,16 +1351,21 @@ class App:
         new, upd = self.reg.refresh()
         if self.reg.index_error:
             return
-        if upd and self.cfg["auto_update_packages"]:
-            for pid in upd:
+        auto = self.reg.auto_updatable() if self.cfg["auto_update_packages"] else []
+        if auto:
+            for pid in auto:
+                old = self.reg.installed[pid]["version"]
                 try:
                     m = self.reg.install(pid)
+                    self.log(f"package auto-updated: {pid} {old} -> {m['version']}")
                     self.notify("Package updated", f"{m['name']} {m['version']}")
                 except Exception as e:
                     self.log(f"auto-update of {pid} failed:", e)
             self.host.reload()
-        elif upd:
-            self.notify("Updates available", ", ".join(self.reg.available()[p]["name"] for p in upd))
+        ask = [p for p in upd if p not in auto]           # community packages (or auto-update off)
+        if ask:
+            self.notify("Updates available", ", ".join(self.reg.available()[p]["name"] for p in ask)
+                        + " (Packages tab)")
         notified = set(self.cfg.get("notified", []))
         fresh = [p for p in new if p not in notified]
         if fresh:
@@ -1385,6 +1406,105 @@ class App:
                 subprocess.Popen(["xdg-open", path])
         except Exception as e:
             messagebox.showerror(APP_NAME, str(e))
+
+
+class CommunitySources(tk.Toplevel):
+    """Other people's package catalogues (their own GitHub repos), added by link."""
+
+    def __init__(self, app):
+        super().__init__(app.root)
+        self.app, self.reg = app, app.reg
+        self.title("Community sources")
+        self.transient(app.root)
+        f = ttk.Frame(self, padding=10)
+        f.pack(fill="both", expand=True)
+        ttk.Label(f, text="Community packages come from other people's GitHub repos. Add a repo by its link "
+                          "(for example github.com/someone/tenet-packages) and its packages show up in the "
+                          "Packages tab, marked with where they're from. TENET Hub doesn't check them: only "
+                          "add people you trust. Community packages never update by themselves.",
+                  wraplength=560, justify="left").pack(anchor="w")
+        row = ttk.Frame(f)
+        row.pack(fill="x", pady=(10, 4))
+        self.link = tk.StringVar()
+        e = ttk.Entry(row, textvariable=self.link, width=60)
+        e.pack(side="left", fill="x", expand=True)
+        e.bind("<Return>", lambda ev: self.add())
+        self.b_add = ttk.Button(row, text="Add", command=self.add)
+        self.b_add.pack(side="left", padx=(6, 0))
+        tv = ttk.Treeview(f, columns=("packages", "status"), show="tree headings", height=6, selectmode="browse")
+        tv.heading("#0", text="Repo")
+        tv.heading("packages", text="Packages")
+        tv.heading("status", text="Status")
+        tv.column("#0", width=220)
+        tv.column("packages", width=80, anchor="center")
+        tv.column("status", width=240)
+        tv.pack(fill="both", expand=True, pady=4)
+        self.tv = tv
+        bar = ttk.Frame(f)
+        bar.pack(fill="x")
+        ttk.Button(bar, text="Open repo page", command=self.open_page).pack(side="left")
+        ttk.Button(bar, text="Remove", command=self.remove).pack(side="left", padx=6)
+        ttk.Button(bar, text="How to make packages", command=lambda: webbrowser.open(
+            "https://github.com/yuniverse-au/tenet-hub/blob/main/docs/community-packages.md")).pack(side="left")
+        ttk.Button(bar, text="Close", command=self.destroy).pack(side="right")
+        self.msg = tk.StringVar()
+        ttk.Label(f, textvariable=self.msg, foreground="#555", wraplength=560).pack(anchor="w", pady=(6, 0))
+        self.refresh()
+        e.focus_set()
+
+    def refresh(self):
+        self.tv.delete(*self.tv.get_children())
+        for url in self.reg.sources():
+            n = len(self.reg.from_source(url))
+            err = self.reg.source_errors.get(url)
+            status = f"couldn't read it: {err}" if err else ("OK" if url in self.reg.community else "not read yet")
+            self.tv.insert("", "end", iid=url, text=packages.source_label(url), values=(n, status))
+
+    def _sel(self):
+        s = self.tv.selection()
+        return s[0] if s else None
+
+    def add(self):
+        link = self.link.get().strip()
+        if not link:
+            return
+        self.b_add.configure(state="disabled")
+        self.msg.set("Reading the catalogue...")
+
+        def done(r, err):
+            if not self.winfo_exists():
+                return
+            self.b_add.configure(state="normal")
+            if err:
+                self.msg.set(f"Not added: {err}")
+                return
+            url, idx = r
+            n = len(self.reg.from_source(url))
+            skipped = len(idx["packages"]) - n
+            self.msg.set(f"Added {packages.source_label(url)}: {n} package{'s' if n != 1 else ''}"
+                         + (f" ({skipped} skipped: same id as an official package, or incomplete)" if skipped else "")
+                         + ". Install them from the Packages tab.")
+            self.link.set("")
+            self.refresh()
+            self.app.refresh_packages()
+        self.app._thread(lambda: self.reg.add_source(link), done)
+
+    def remove(self):
+        url = self._sel()
+        if not url:
+            return
+        if not messagebox.askyesno(APP_NAME, f"Remove {packages.source_label(url)}?\n\nPackages you installed "
+                                             "from it stay installed (remove them in the Packages tab), but they "
+                                             "won't get updates.", parent=self):
+            return
+        self.reg.remove_source(url)
+        self.refresh()
+        self.app.refresh_packages()
+
+    def open_page(self):
+        url = self._sel()
+        if url:
+            webbrowser.open(packages.source_page(url))
 
 
 class PackageSettings(tk.Toplevel):

@@ -1,6 +1,8 @@
 # Writing a TENET Hub package
 
-A package is a folder with a `package.json` and a Python file. Put the folder in `packages/` in this repository and run `python tools/build_index.py`. To try it locally first, copy the folder into `%LOCALAPPDATA%\TenetHub\packages\` and restart TENET Hub.
+A package is a folder with a `package.json` and a Python file. To try one, copy the folder into `%LOCALAPPDATA%\TenetHub\packages\` and restart TENET Hub.
+
+**Sharing it:** publish it from your own GitHub repo as a community package. **[docs/community-packages.md](community-packages.md)** walks through it. This repository's `packages/` folder only holds the official packages that come with TENET Hub; after changing one, run `python tools/build_index.py`.
 
 ## Screen package
 Gets a screen of its own on the keyboard (REVIVER v21+; the user places it in the **Screens** tab). On older firmware it draws on the *Custom Text* screen, one screen package at a time. `ctx.show()` brings the package's screen up (for example when music starts).
@@ -96,4 +98,4 @@ Extra `.py` files in your package folder can be imported relatively (`from . imp
 
 ## Rules
 - Don't talk to the keyboard yourself. The host owns the connection and sends strictly one packet per reply. Sending faster has jammed a keyboard before.
-- Packages run as normal programs on the user's PC. Only the catalogue in this repository (and folders the user adds themselves) gets installed, so review package code before merging it.
+- Packages run as normal programs on the user's PC. TENET Hub installs from the official catalogue (this repository: review package code before merging it), from community sources the user added themselves, and from folders the user put in the packages folder. Official packages update automatically; community packages only when the user clicks Update.

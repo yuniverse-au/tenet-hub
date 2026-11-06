@@ -1,6 +1,10 @@
 """Builds the catalogue the app reads: index.json + catalog/<package>-<version>.zip.
 
     python tools/build_index.py
+    python tools/build_index.py --community --root ../my-tenet-packages [--name "My packages"]
+
+The second form builds a community catalogue in someone's own repo (packages only: no firmware or
+TENET Hub entries). See docs/community-packages.md.
 
 Run it after changing a package or adding a firmware release, then commit index.json and catalog/.
 Packages come from packages/<id>/ (package.json + code). Firmware releases come from
@@ -35,16 +39,25 @@ def zip_package(folder, out_path):
 
 
 def main():
-    os.makedirs(os.path.join(ROOT, "catalog"), exist_ok=True)
+    import argparse
+    ap = argparse.ArgumentParser(description="Build index.json + catalog/ from packages/")
+    ap.add_argument("--root", default=ROOT, help="the repo to build (default: this one)")
+    ap.add_argument("--community", action="store_true", help="a community catalogue: packages only")
+    ap.add_argument("--name", default="", help="community catalogue name shown in TENET Hub")
+    a = ap.parse_args()
+    base = os.path.abspath(a.root)
+    if not os.path.isdir(os.path.join(base, "packages")):
+        sys.exit(f"no packages/ folder in {base}")
+    os.makedirs(os.path.join(base, "catalog"), exist_ok=True)
     packages = []
-    for pid in sorted(os.listdir(os.path.join(ROOT, "packages"))):
-        folder = os.path.join(ROOT, "packages", pid)
+    for pid in sorted(os.listdir(os.path.join(base, "packages"))):
+        folder = os.path.join(base, "packages", pid)
         if not os.path.isfile(os.path.join(folder, "package.json")):
             continue
         m = Manifest.load(folder)
         rel = f"catalog/{m['id']}-{m['version']}.zip"
-        zip_package(folder, os.path.join(ROOT, rel))
-        data = open(os.path.join(ROOT, rel), "rb").read()
+        zip_package(folder, os.path.join(base, rel))
+        data = open(os.path.join(base, rel), "rb").read()
         entry = {k: m[k] for k in ("id", "name", "version", "type", "description", "requires_firmware")}
         for k in ("author", "default_mode", "changelog", "requires_hub"):
             if k in m:
@@ -53,8 +66,12 @@ def main():
         packages.append(entry)
         print(f"package  {m['id']} {m['version']}  {len(data)} bytes")
 
+    if a.community:
+        index = {"format": 1, "name": a.name, "packages": packages}
+        return write(base, index)
+
     releases = []
-    fwroot = os.path.join(ROOT, "firmware")
+    fwroot = os.path.join(base, "firmware")
     for fid in sorted(os.listdir(fwroot)) if os.path.isdir(fwroot) else []:
         rpath = os.path.join(fwroot, fid, "release.json")
         if not os.path.isfile(rpath):
@@ -70,10 +87,14 @@ def main():
 
     index = {"format": 1, "hub": {"version": VERSION, "url": HUB_RELEASES},
              "packages": packages, "firmware": releases}
-    with open(os.path.join(ROOT, "index.json"), "w", encoding="utf-8", newline="\n") as f:
+    write(base, index)
+
+
+def write(base, index):
+    with open(os.path.join(base, "index.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(index, f, indent=2, ensure_ascii=False)
         f.write("\n")
-    print("wrote index.json")
+    print("wrote", os.path.join(base, "index.json"))
 
 
 if __name__ == "__main__":
