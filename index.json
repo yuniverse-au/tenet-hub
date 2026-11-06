@@ -21,21 +21,21 @@
   ],
   "firmware": [
     {
-      "name": "REVIVER v17",
-      "patch_version": 17,
-      "notes": "GIF screen: store an animation on the keyboard and it plays by itself, even with the PC off (replaces the Monitor screen; upload from the GIF screen tab). v17 recovers if the GIF screen was left stuck by an earlier crash, keeps screen switching responsive during long GIF frames, and can report the player's state for troubleshooting. Also: safe flash-chip access, live drawing for packages, tear-free scrolling, Yuniverse boot logo, screen button skips KPM and clock, blank Custom Text screen for Now Playing, screen-off support.",
+      "name": "REVIVER v18",
+      "patch_version": 18,
+      "notes": "GIF screen: store an animation on the keyboard and it plays by itself, even with the PC off (replaces the Monitor screen; upload from the GIF screen tab). v18: the screen button skips KPM and clock in both directions and never skips the GIF screen. Also: recovery from a stuck GIF screen, player state for troubleshooting, safe flash-chip access, live drawing for packages, tear-free scrolling, Yuniverse boot logo, blank Custom Text screen for Now Playing, screen-off support.",
       "base": {
         "version": "3.0.7",
         "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
         "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
         "size": 86620
       },
-      "id": "v17",
+      "id": "v18",
       "patch": {
-        "url": "firmware/v17/patch.json",
-        "sha256": "A1EC61CA8F63C6B89F4B23F2319FAB4A70738AB2CD8E347F5F66009A783867F5"
+        "url": "firmware/v18/patch.json",
+        "sha256": "018E4F785F9CC8DEE6D364DAE27672FC47E4AC548E058BF8799813DB65BBCD7D"
       },
-      "result_sha256": "E7C0EAA479C59246AA2770B5B5D11409DDE1732C4195CAEE0BD8B955B3DF2F1E",
+      "result_sha256": "44179956C0CF4B800BB3DF0754AE5AA25333ADD7831EC31635BEC202BA2ABA50",
       "result_size": 91584,
       "base_sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56"
     }
