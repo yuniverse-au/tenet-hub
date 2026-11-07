@@ -5,13 +5,15 @@
     python tenet_hub.py --headless # no window: just run the packages (for testing)
     python tenet_hub.py --sensors  # the temperature helper (started as administrator at login)
     python tenet_hub.py --sensors-setup USER / --sensors-remove   (as administrator; see hub/sensors.py)
+    TenetHub.exe --updated         # started by the previous version after an update (see hub/updater.py)
+    TenetHub.exe --write-version FILE   # the check a downloaded update has to pass
 """
 import datetime, os, sys, threading, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from hub import APP_NAME, VERSION, power                 # noqa: E402
+from hub import APP_NAME, VERSION, power, updater        # noqa: E402
 from hub.config import Config, data_dir, set_start_at_login   # noqa: E402
 from hub.packages import Registry                         # noqa: E402
 from hub.host import Host                                 # noqa: E402
@@ -96,13 +98,20 @@ def sensors_main():
 def main():
     if "--selftest" in sys.argv:
         return selftest()
+    if "--write-version" in sys.argv:
+        from hub import ui                                # noqa: F401  (the whole app has to import)
+        with open(sys.argv[sys.argv.index("--write-version") + 1], "w", encoding="utf-8") as f:
+            f.write(VERSION)
+        return
     if any(a.startswith("--sensors") for a in sys.argv):
         sys.exit(sensors_main() or 0)
     log, log_path = make_logger()
-    if not power.single_instance("TenetHub"):
+    if not power.single_instance("TenetHub", wait=60 if "--updated" in sys.argv else 0):
         log("already running")
         return
     log(f"--- {APP_NAME} {VERSION} starting")
+    if updater.supported():
+        updater.cleanup()
     cfg = Config()
     reg = Registry(cfg, log)
     reg.bundled(bundled_packages_dir())

@@ -39,14 +39,27 @@ jobs:
           $p = Start-Process -FilePath dist/TenetHub.exe -ArgumentList "--selftest" -PassThru -Wait
           if ($p.ExitCode -ne 0 -or -not (Test-Path selftest.ok)) { Write-Error "exe self-test failed (exit $($p.ExitCode))"; exit 1 }
           Get-Content selftest.ok
+      - name: Publish the checksum the app's self-update checks (and the tag must match the app's version)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist/TenetHub.exe -ArgumentList "--write-version","version.txt" -PassThru -Wait
+          if ($p.ExitCode -ne 0 -or -not (Test-Path version.txt)) { Write-Error "--write-version failed (exit $($p.ExitCode))"; exit 1 }
+          $v = (Get-Content version.txt).Trim()
+          if ($env:GITHUB_REF_TYPE -eq "tag" -and "v$v" -ne $env:GITHUB_REF_NAME) { Write-Error "tag $env:GITHUB_REF_NAME doesn't match VERSION $v"; exit 1 }
+          (Get-FileHash dist/TenetHub.exe -Algorithm SHA256).Hash | Set-Content -NoNewline -Encoding ascii dist/TenetHub.exe.sha256
+          Get-Content dist/TenetHub.exe.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: TenetHub
-          path: dist/TenetHub.exe
+          path: |
+            dist/TenetHub.exe
+            dist/TenetHub.exe.sha256
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: TENET Hub ${{ github.ref_name }}
           body_path: RELEASE_NOTES.md
-          files: dist/TenetHub.exe
+          files: |
+            dist/TenetHub.exe
+            dist/TenetHub.exe.sha256

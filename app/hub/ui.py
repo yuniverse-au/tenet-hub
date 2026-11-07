@@ -5,7 +5,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image, ImageDraw
 
-from . import APP_NAME, VERSION, api, bootlogo, firmware, flasher, gif, packages, screens, sensors, stats as pcstats
+from . import APP_NAME, VERSION, api, bootlogo, firmware, flasher, gif, packages, screens, sensors, stats as pcstats, updater
 from .device import Keyboard, enumerate_keyboards
 from .config import data_dir, set_start_at_login
 
@@ -150,7 +150,7 @@ class App:
         self.status_var = tk.StringVar()
         ttk.Label(top, textvariable=self.status_var, foreground="#555").pack(side="left", padx=14)
         self.banner = ttk.Label(self.root, foreground="#0a5", cursor="hand2")
-        self.banner.bind("<Button-1>", lambda e: self._open_hub_release())
+        self.banner.bind("<Button-1>", lambda e: self.update_hub())
         nb = ttk.Notebook(self.root)
         nb.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         self.nb = nb
@@ -1348,7 +1348,7 @@ class App:
         ttk.Label(top, text=f"{APP_NAME} {VERSION}", font=("Segoe UI", 10, "bold")).pack(side="left")
         self.b_hub_check = ttk.Button(top, text="Check for updates", command=lambda: self.check_updates(manual=True))
         self.b_hub_check.pack(side="right")
-        self.b_hub_download = ttk.Button(top, text="Download", command=self._open_hub_release)
+        self.b_hub_update = ttk.Button(top, text="Update", command=self.update_hub)
         self.hub_upd_msg = tk.StringVar(value="")
         ttk.Label(box, textvariable=self.hub_upd_msg).pack(anchor="w", pady=(4, 0))
         v = tk.BooleanVar(value=bool(self.cfg["check_updates"]))
@@ -1399,6 +1399,7 @@ class App:
 
     # --- updates ----------------------------------------------------------------------------
     update_checking = False
+    hub_updating = None                  # text saying what an update of TENET Hub itself is doing
 
     def check_updates(self, quiet=False, manual=False):
         """quiet: no error box. manual: from a "Check for updates" button (shows the result)."""
@@ -1429,17 +1430,22 @@ class App:
     def _hub_update_text(self):
         if not hasattr(self, "hub_upd_msg"):
             return
+        if self.hub_updating:
+            self.hub_upd_msg.set(self.hub_updating)
+            self.b_hub_update.pack_forget()
+            return
         if self.update_checking:
             self.hub_upd_msg.set("Checking for updates...")
-            self.b_hub_download.pack_forget()
+            self.b_hub_update.pack_forget()
             return
         h = self.reg.hub_update()
         if h:
             self.hub_upd_msg.set(f"TENET Hub {h['version']} is available.{self._checked_text()}")
-            self.b_hub_download.configure(text=f"Download {h['version']}")
-            self.b_hub_download.pack(side="right", padx=6)
+            self.b_hub_update.configure(text=f"Update to {h['version']} and restart" if updater.supported()
+                                        else f"Download {h['version']}")
+            self.b_hub_update.pack(side="right", padx=6)
         else:
-            self.b_hub_download.pack_forget()
+            self.b_hub_update.pack_forget()
             if self.reg.index_error:
                 self.hub_upd_msg.set(f"Couldn't check for updates: {self.reg.index_error}")
             elif self.reg.index:
@@ -1501,8 +1507,12 @@ class App:
 
     def _hub_banner(self):
         h = self.reg.hub_update()
+        if self.hub_updating:
+            self.banner.configure(text=self.hub_updating)
+        elif h:
+            action = "update and restart" if updater.supported() else "download"
+            self.banner.configure(text=f"TENET Hub {h['version']} is available - click to {action}")
         if h:
-            self.banner.configure(text=f"TENET Hub {h['version']} is available - click to download")
             self.banner.pack(fill="x", padx=10, before=self.nb)
         else:
             self.banner.pack_forget()
@@ -1511,6 +1521,61 @@ class App:
         h = self.reg.hub_update()
         if h and h.get("url"):
             webbrowser.open(h["url"])
+
+    def _hub_update_state(self, text):
+        """What the update is doing (None: nothing), shown in the banner and the Settings tab."""
+        self.hub_updating = text
+        self._hub_banner()
+        self._hub_update_text()
+
+    def update_hub(self):
+        """The "update and restart" button: download and check on a thread, then swap and restart."""
+        h = self.reg.hub_update()
+        if not h or self.hub_updating:
+            return
+        if not updater.supported():
+            self._open_hub_release()
+            return
+        version = h["version"]
+        self._hub_update_state(f"Downloading TENET Hub {version}...")
+        seen = [-1]
+
+        def progress(frac):
+            pct = int(frac * 100)
+            if pct != seen[0]:
+                seen[0] = pct
+                self.ui(self._hub_update_state, f"Downloading TENET Hub {version}... {pct}%"
+                        if pct < 100 else f"Checking TENET Hub {version}...")
+
+        def done(path, err):
+            if err:
+                self._hub_update_failed(err)
+            else:
+                self._hub_restart(path, version)
+        self._thread(lambda: updater.prepare(version, progress=progress), done)
+
+    def _hub_restart(self, path, version):
+        if self.busy or self.host.storing:               # never restart in the middle of a keyboard write
+            self._hub_update_state(f"TENET Hub {version} is ready. It will restart when the keyboard is finished.")
+            self.root.after(2000, self._hub_restart, path, version)
+            return
+        try:
+            updater.install(path, ["--tray"] if self.root.state() == "withdrawn" else [])
+        except updater.UpdateError as e:
+            self._hub_update_failed(e)
+            return
+        self.log(f"updating to {version}: restarting")
+        watchdog = threading.Timer(15, os._exit, [0])    # the new copy is waiting: never hang on the way out
+        watchdog.daemon = True
+        watchdog.start()
+        self.quit()
+
+    def _hub_update_failed(self, err):
+        self.log("update failed:", err)
+        self._hub_update_state(None)
+        if messagebox.askyesno(APP_NAME, f"TENET Hub couldn't update itself:\n\n{err}\n\n"
+                                         "Your current version is unchanged. Open the download page instead?"):
+            self._open_hub_release()
 
     def _open(self, path):
         try:

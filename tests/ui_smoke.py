@@ -86,7 +86,7 @@ def step(i=0, *extra):
         app.root.after(800, lambda: (shot("settings_update.png"), step(i + 1, fwmsg)))
     else:
         print("auto check on switching to Firmware:", len(CHECKS), "| firmware:", extra[0])
-        print("settings:", app.hub_upd_msg.get(), "| download button:", app.b_hub_download.winfo_ismapped())
+        print("settings:", app.hub_upd_msg.get(), "| update button:", app.b_hub_update.winfo_ismapped())
         print("running:", sorted(host.running), "problems:", host.problems, "status:", host.status)
         app.quit()
 

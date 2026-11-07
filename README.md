@@ -47,7 +47,7 @@ How many frames fit depends on the keyboard's flash chip (about 190 on a 1 MB ch
 The boot logo has its own 8 KB of the keyboard's flash chip, so it never uses image screen frames. It needs REVIVER v20 or newer.
 
 ### Updates
-TENET Hub checks GitHub for new packages, firmware and TENET Hub versions every few hours (Settings → *Check GitHub for new packages and updates automatically*). Opening the **Firmware** tab checks again and tells you if a newer REVIVER is available for your keyboard. Both the Firmware and Settings tabs also have a *Check for updates* button. Official packages can update themselves; community packages update when you click Update (or automatically, if you turn that on in Settings); firmware never installs without you clicking Install.
+TENET Hub checks GitHub for new packages, firmware and TENET Hub versions every few hours (Settings → *Check GitHub for new packages and updates automatically*). When a new TENET Hub is out, click the banner at the top of the window, or *Update and restart* in Settings: it downloads the new version, checks it, replaces itself and restarts. If it can't (for example, its folder is read-only), your current version keeps running and it offers the download page instead. Opening the **Firmware** tab checks again and tells you if a newer REVIVER is available for your keyboard. Both the Firmware and Settings tabs also have a *Check for updates* button. Official packages can update themselves; community packages update when you click Update (or automatically, if you turn that on in Settings); firmware never installs without you clicking Install.
 
 ### If something goes wrong
 Unplug the keyboard, **hold Esc while plugging it back in** (it starts in update mode), then install the official firmware from the Firmware tab. Typing keeps working on every REVIVER version.
@@ -74,11 +74,12 @@ REVIVER is built on top of Hexcore's official 3.0.7 firmware, and this repositor
 ## Publishing
 - **Package change:** bump `version` in its `package.json`, run `python tools/build_index.py`, then commit and push. Users get it on their next check (every 6 hours, or *Check for updates*).
 - **New firmware:** `python tools/make_patch.py official_3.07.bin patched.bin v14 --name "..." --patch-version 14 --notes "..."`, then `build_index.py`, then commit and push.
-- **New app version:** bump `VERSION` in `app/hub/__init__.py`, run `build_index.py`, commit, then `git tag v1.0.1 && git push --tags`. GitHub Actions builds `TenetHub.exe` and attaches it to a Release, and the app shows users a download banner.
+- **New app version:** bump `VERSION` in `app/hub/__init__.py`, run `build_index.py`, commit, then `git tag v1.0.1 && git push --tags`. GitHub Actions builds `TenetHub.exe` and attaches it to a Release with its checksum (`TenetHub.exe.sha256`), and the app shows users an update banner. The app updates from that exact tag, so the tag has to match `VERSION` (the build fails if it doesn't). Until the build finishes, an update attempt says the download isn't ready yet.
 
 ## Development
 ```
 pip install -r requirements.txt
 python app/tenet_hub.py          # window + tray
 python tests/test_hub.py official_3.07.bin patched.bin
+python tests/test_updater.py
 ```

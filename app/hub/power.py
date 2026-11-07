@@ -9,7 +9,7 @@ because Windows sends these notifications as window messages.
     w.start()
     w.asleep   # True while the PC is suspending / shutting down / monitor off
 """
-import ctypes, sys, threading
+import ctypes, sys, threading, time
 from ctypes import wintypes
 
 WM_POWERBROADCAST = 0x0218
@@ -141,11 +141,21 @@ class PowerWatcher:
             self.log("power watcher unavailable (screen won't follow sleep/shutdown):", e)
 
 
-def single_instance(name="TenetNowPlaying"):
-    """False if another copy is already running (Windows named mutex)."""
+def single_instance(name="TenetNowPlaying", wait=0):
+    """False if another copy is already running (Windows named mutex). `wait`: seconds to give that
+    copy to exit (the previous version, after an update)."""
     if sys.platform != "win32":
         return True
     k = ctypes.WinDLL("kernel32", use_last_error=True)
     k.CreateMutexW.restype = wintypes.HANDLE
-    single_instance._h = k.CreateMutexW(None, False, "Local\\" + name)   # keep it open
-    return ctypes.get_last_error() != 183                                 # ERROR_ALREADY_EXISTS
+    k.CloseHandle.argtypes = [wintypes.HANDLE]
+    deadline = time.monotonic() + wait
+    while True:
+        h = k.CreateMutexW(None, False, "Local\\" + name)
+        if ctypes.get_last_error() != 183:                                # ERROR_ALREADY_EXISTS
+            single_instance._h = h                                        # keep it open
+            return True
+        k.CloseHandle(h)                                                  # or this handle keeps it alive
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.25)
