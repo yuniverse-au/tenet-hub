@@ -48,7 +48,7 @@ reg = Registry(cfg, log)
 # --- catalogue -----------------------------------------------------------------------------------
 new, upd = reg.refresh()
 check(f"catalogue fetched: new={new} updates={upd} firmware={[f['id'] for f in reg.firmware_releases()]}",
-      new == ["nowplaying"] and upd == [] and reg.firmware_releases()[0]["patch_version"] == 25)
+      new == ["nowplaying"] and upd == [] and reg.firmware_releases()[0]["patch_version"] == 26)
 m = reg.install("nowplaying")
 check(f"installed {m['id']} {m['version']}; no longer 'new'", "nowplaying" in reg.installed and reg.new_ids() == [])
 
@@ -170,7 +170,7 @@ except ValueError as e:
 rel = reg.firmware_releases()[0]
 rel = dict(rel, base=dict(rel["base"], url=firmware.OFFICIAL_307["url"]))   # local copy instead of Hexcore
 img = firmware.build(rel, INDEX)
-check(f"v25 rebuilt from official + patch, sha {firmware.sha256(img)[:16]}", img == open(PATCHED, "rb").read())
+check(f"v26 rebuilt from official + patch, sha {firmware.sha256(img)[:16]}", img == open(PATCHED, "rb").read())
 bad = dict(rel, patch=dict(rel["patch"], sha256="00" * 32))
 try:
     firmware.build(bad, INDEX)
@@ -182,7 +182,7 @@ B = fake_hid.BOARD
 B.patch, B.state = 0, "app"            # official firmware on the keyboard
 steps = []
 flasher.flash(img, {rel["result_sha256"]}, lambda f, msg: steps.append(msg))
-check(f"flashed: {len(B.flash)} bytes match v25, back in normal mode, no pipelined packets",
+check(f"flashed: {len(B.flash)} bytes match v26, back in normal mode, no pipelined packets",
       bytes(B.flash[:len(img)]) == img and B.state == "app" and B.violations == 0)
 try:
     flasher.flash(img + b"x", {rel["result_sha256"]})
@@ -520,6 +520,73 @@ except gif.GifError as e:
 kb.close()
 B.patch = 20
 check(f"still no pipelined packets (violations={B.violations})", B.violations == 0)
+
+# --- v26: several stored images; animation packages get stored screens of their own ------------
+B.patch, B.state = 26, "app"
+B.spi[0x40000:] = b"\xff" * (len(B.spi) - 0x40000)
+kb = Keyboard(b"vendor")
+inf = gif.info(kb)
+pool = (B.chip - 7 * 0x1000 - 0x41000) // 0x1000
+check(f"v26 info: {inf['slots']} slots, pool {inf['pool']}", inf["slots"] == 8 and inf["pool"] == pool)
+gif.upload(kb, fr, 192)                                  # the Image screen (slot 0)
+three = [(Image.new("L", (256, 32), 17 * k), 5) for k in range(3)]
+gif.upload(kb, three, 192, slot=2)
+sl = gif.read_slots(kb)
+check(f"slot 0 and slot 2 side by side: {sl}", sl == {0: (0, len(fr)), 2: (len(fr), 3)})
+h2 = bytes(B.spi[B.chip - 0x2000:B.chip - 0x2000 + 12])
+check(f"slot 2 header at the chip's end, version 2: {h2.hex()}", h2[:5] == b"TGIF\x02" and struct.unpack_from("<H", h2, 10)[0] == len(fr))
+check("slot 2 frames stored after the Image screen's", all(bytes(B.spi[0x41000 + (len(fr) + i) * 4096:0x42000 + (len(fr) + i) * 4096]) == screen.to_4bpp(img)
+                                                          for i, (img, _) in enumerate(three)))
+more = fr + fr                                           # the Image screen grows: must not overwrite slot 2
+gif.upload(kb, more, 192)
+sl = gif.read_slots(kb)
+check(f"a bigger Image screen moves past slot 2's frames: {sl}", sl[2] == (len(fr), 3) and sl[0][0] >= len(fr) + 3)
+check("slot 2's frames are intact", bytes(B.spi[0x41000 + len(fr) * 4096:0x42000 + len(fr) * 4096]) == screen.to_4bpp(three[0][0]))
+try:
+    gif.upload(kb, [(Image.new("L", (256, 32), 0), 1)] * (pool - 2), 192, slot=3)
+    check("too big for what's left: refused", False)
+except gif.GifError as e:
+    check(f"too big for what's left: refused ({e})", "room for" in str(e))
+gif.clear(kb, 2)
+check("slot 2 cleared", 2 not in gif.read_slots(kb))
+kb.close()
+# host: an animation package gets stored in a slot and a screen of its own
+apath = os.path.join(reg.root, "test-loop")
+os.makedirs(apath, exist_ok=True)
+loop = [Image.new("RGB", (256, 32), (60 * k, 60 * k, 60 * k)) for k in range(4)]
+loop[0].save(os.path.join(apath, "animation.gif"), save_all=True, append_images=loop[1:], duration=100, loop=0)
+json.dump({"id": "test-loop", "name": "Test loop", "version": "1.0.0", "type": "animation", "file": "animation.gif",
+           "gif_settings": {"fps_cap": 10}}, open(os.path.join(apath, "package.json"), "w"))
+reg.scan()
+cfg.pkg("test-loop")["enabled"] = True; cfg.save()
+cfg.set("stored_images", {})
+host._disconnect("x")
+for _ in range(4):
+    host._tick()
+st = host.stored()
+check(f"animation package stored in a slot of its own: {st}", st.get("test-loop", {}).get("slot") == 1)
+slots = gif.read_slots(host.kb)
+check(f"... on the keyboard: {slots}", 1 in slots and slots[1][1] == 4)
+check(f"... and in the screen list right after the Image screen: {[hex(x) for x in B.scr]}",
+      0x41 in B.scr and B.scr.index(0x41) == B.scr.index(6) + 1)
+check("its status in the Packages tab would be 'On the keyboard'", "test-loop" not in host.problems and host.storing is None)
+n = B.gif_writes
+for _ in range(3):
+    host._tick()
+check("not stored again while it's there", B.gif_writes == n)
+B.mode, B.stats_on, B.imgslot = 6, False, 0
+B.press(); check("button from the Image screen -> the stored animation's screen (0x41)", B.mode == 6 and B.imgslot == 1)
+cfg.pkg("test-loop")["enabled"] = False; cfg.save()
+for _ in range(3):
+    host._tick()
+check(f"turned off: slot freed and the screen leaves the list ({host.stored()}, {[hex(x) for x in B.scr]})",
+      "test-loop" not in host.stored() and 0x41 not in B.scr and 1 not in gif.read_slots(host.kb))
+B.patch = 25; host._disconnect("x"); cfg.pkg("test-loop")["enabled"] = True; cfg.save()
+for _ in range(3):
+    host._tick()
+check("v25 keyboard: animation packages aren't stored or listed", "test-loop" not in host.stored() and 0x41 not in B.scr)
+cfg.pkg("test-loop")["enabled"] = False; cfg.save(); B.patch = 26
+check(f"no pipelining ({B.violations})", B.violations == 0)
 
 print("ALL PASS" if ok else "SOME FAILED")
 srv.shutdown()

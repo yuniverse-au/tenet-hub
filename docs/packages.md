@@ -71,7 +71,7 @@ class Package(api.BackgroundPackage):
 ```
 
 ## Animation package
-A GIF for the keyboard's image screen, with the adjustments it looks best with. It doesn't run any code: it shows up in the Image screen tab.
+A GIF stored on the keyboard, with the adjustments it looks best with. It doesn't run any code. On REVIVER v26 or newer, turning it on stores it on the keyboard as **a screen of its own** (up to 7 of these, sharing the keyboard's frame space with the Image screen), so it plays even with the PC off and shows up in the Screens tab. On older firmware it's a preset in the Image screen tab.
 ```json
 {
   "id": "my-loop", "name": "My loop", "version": "1.0.0", "type": "animation",

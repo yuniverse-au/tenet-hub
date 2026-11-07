@@ -22,22 +22,22 @@
   ],
   "firmware": [
     {
-      "name": "REVIVER v25",
-      "patch_version": 25,
-      "notes": "PC stats labels follow what each number measures: CPU, GPU, RAM or DISK (pick in the PC stats tab), drawn in the keyboard's own label style. Everything from v24: PC stats as a built-in screen with temperature or usage per number, your own screen list, a screen for every screen package, changeable boot logo, the image screen, live drawing, tear-free scrolling, screen-off support.",
+      "name": "REVIVER v26",
+      "patch_version": 26,
+      "notes": "Animation packages get screens of their own: the keyboard now stores up to 7 more images or GIFs next to your Image screen, each its own screen in the Screens tab, all playing with the PC off. Turn an animation package on in the Packages tab and TENET Hub stores it. Your current Image screen stays as it is. Everything from v25: PC stats labels (CPU, GPU, RAM or DISK), PC stats with temperature or usage, your own screen list, a screen for every screen package, changeable boot logo, live drawing, screen-off support.",
       "base": {
         "version": "3.0.7",
         "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
         "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
         "size": 86620
       },
-      "id": "v25",
+      "id": "v26",
       "patch": {
-        "url": "firmware/v25/patch.json",
-        "sha256": "D00E009A1760D21CBD1D8A0B63A2BB3869BFAE0A4F998101FF4CA087E715034F"
+        "url": "firmware/v26/patch.json",
+        "sha256": "37C37856904614650BFA2248F5897786968031894640401CB668320346DE5784"
       },
-      "result_sha256": "16F16B5B44CE317305C543C36ED5AC0088481372BD311E7F4675A3335991109E",
-      "result_size": 93784,
+      "result_sha256": "3F6D442AE7246947EBEA534A96BCDF2D79E6CD5B2951CFCA7D3D6B0228140866",
+      "result_size": 94032,
       "base_sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56"
     }
   ]

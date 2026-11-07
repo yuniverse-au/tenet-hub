@@ -9,7 +9,7 @@ import ctypes, datetime, os, sys, threading, time, traceback
 
 from PIL import Image
 
-from . import screens as screenlist, api, power, stats as pcstats
+from . import screens as screenlist, api, gif, power, stats as pcstats
 from .config import data_dir, windows_uses_12h
 from .device import Keyboard, enumerate_keyboards
 from .screen import Screen
@@ -52,6 +52,8 @@ class Host:
         self.stats = pcstats.Sampler(cfg, log)           # PC stats screen (v24)
         self.brightness, self._bright_at, self._bright_want = None, 0.0, None
         self._units_sent, self._stats_at, self._labels_sent = None, 0.0, {}
+        self._kb_slots = None
+        self.storing = None                           # (package id, fraction, message) while storing one
         self.running = {}                 # id -> Running
         self.problems = {}                # id -> why it isn't running
         self.paused = threading.Event()   # set while flashing: the host lets go of the keyboard
@@ -180,10 +182,11 @@ class Host:
             if pid not in self.running and pid not in self.problems:
                 self._start_pkg(m)
         for pid in list(self.problems):
-            if pid not in wanted:
+            if pid not in wanted and self.reg.installed.get(pid, {}).get("type") != "animation":
                 self.problems.pop(pid)
         patch = self.fw.patch if self.fw is not None and self.fw.kind == "patch" else 99
-        self.want, self.slots = screenlist.keyboard_list(screenlist.entries(self.cfg, self.reg), patch)
+        self.want, self.slots = screenlist.keyboard_list(screenlist.entries(self.cfg, self.reg), patch,
+                                                         {p: v["slot"] for p, v in self.stored().items()})
         if self.want and screenlist.STATS in self.want:
             self.stats.start()
         else:
@@ -228,6 +231,7 @@ class Host:
         self._sent_list, self._sent_at = None, 0.0
         self._clock_at, self._clock_fmt = 0.0, None   # last clock sync; 12h flag sent this connection
         self._units_sent, self._stats_at, self._labels_sent = None, 0.0, {}
+        self._kb_slots = None                         # v26 image slots as read from this keyboard
         self._lights_sent = None
         self.brightness, self._bright_at = None, 0.0  # key lights 0-100, as the keyboard last said
         self.screen = Screen(kb, fw, self.cfg["contrast"]) if fw.at_least(1) else None
@@ -246,6 +250,70 @@ class Host:
         self.problems.clear()                      # firmware may have changed: re-check
         self._event("connected", fw)
         return True
+
+    # --- stored images: animation packages on screens of their own (v26) ------------------
+    def stored(self):
+        """{package id: {"slot", "version"}} stored on this keyboard by TENET Hub."""
+        return dict(self.cfg.get("stored_images") or {})
+
+    def _set_stored(self, d):
+        self.cfg.set("stored_images", d)
+
+    def _sync_stored(self):
+        """Store each enabled animation package in an image slot of its own (one per tick: it takes
+        a while), and free the slots of packages turned off or removed."""
+        if self._kb_slots is None:
+            self._kb_slots = gif.read_slots(self.kb)
+        stored = self.stored()
+        wanted = {pid: m for pid, m in self.reg.installed.items()
+                  if m.get("type") == "animation" and self.cfg.pkg(pid).get("enabled")}
+        for pid in list(self.problems):
+            if pid not in wanted and self.reg.installed.get(pid, {}).get("type") == "animation":
+                self.problems.pop(pid)
+        for pid in list(stored):                                  # turned off / removed: free the slot
+            if pid not in wanted:
+                s = stored.pop(pid)["slot"]
+                try:
+                    gif.clear(self.kb, s)
+                except gif.GifError as e:
+                    self.log("couldn't clear image slot", s, e)
+                self._kb_slots.pop(s, None)
+                self._set_stored(stored)
+                self.log(f"removed {pid} from image slot {s}")
+                return
+        failed = getattr(self, "_store_failed", {})
+        for pid, m in sorted(wanted.items()):
+            have = stored.get(pid)
+            if have and have.get("version") == m["version"] and have["slot"] in self._kb_slots:
+                self.problems.pop(pid, None)
+                continue
+            if failed.get(pid) == m["version"]:
+                continue                                          # failed for this version: wait for a change
+            used = {v["slot"] for p, v in stored.items() if p != pid}
+            slot = have["slot"] if have else next((s for s in range(1, gif.SLOTS) if s not in used), None)
+            if slot is None:
+                self.problems[pid] = f"No free stored screen (the keyboard holds {gif.SLOTS - 1}); turn another off"
+                continue
+            try:
+                s = dict(gif.DEFAULTS)
+                s.update(m.get("gif_settings") or {})
+                frames = gif.convert(m.animation_path(), s)
+                self.storing = (pid, 0.0, "Preparing...")
+                self.log(f"storing {pid} {m['version']} in image slot {slot} ({len(frames)} frames)")
+                gif.upload(self.kb, frames, s["burst"], lambda frac, msg, pid=pid: setattr(self, "storing", (pid, frac, msg)),
+                           slot=slot)
+            except gif.GifError as e:
+                self.problems[pid] = f"Couldn't store it on the keyboard: {e}"
+                self._store_failed = dict(failed, **{pid: m["version"]})
+                return
+            finally:
+                self.storing = None
+            stored[pid] = {"slot": slot, "version": m["version"]}
+            self._set_stored(stored)
+            self._kb_slots = gif.read_slots(self.kb)
+            self.problems.pop(pid, None)
+            self.log(f"stored {m.get('name', pid)} in image slot {slot}")
+            return
 
     # --- PC stats screen (v24) -----------------------------------------------------------
     def _feed_stats(self, current):
@@ -364,6 +432,8 @@ class Host:
             self._sync_clock()
             self._sync_lighting()
             self._sync_brightness()
+            if self.fw.at_least(gif.SLOTS_PATCH) and not self.asleep:
+                self._sync_stored()
             v21 = self._v21()
             while self._requests:
                 kind, value, pid = self._requests.pop(0)

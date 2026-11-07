@@ -8,6 +8,12 @@ Storage layout (offsets from the GIF area, which starts at 0x40000 on the flash 
   0x0000  header: "TGIF", version 1, flags, frame count u16, burst u16, 6 spare bytes,
           then one u16 delay per frame in 10 ms ticks
   0x1000  frame 0, then frame 1, ...: 4096 bytes each, the screen in controller order
+
+REVIVER v26 stores several images side by side ("slots"), each its own screen:
+  slot 0     = the Image screen; header at 0x0000 (as above)
+  slots 1..7 = more stored images (list codes 0x41..0x47); headers in the chip's last 7 sectors
+  All frames come from one pool starting at 0x1000. A version 2 header adds the slot's first pool
+  frame (u16 at bytes 10..11); version 1 (slot 0 only) means pool frame 0.
 """
 import io, struct, zlib
 
@@ -19,6 +25,8 @@ W, H = 256, 32
 MAGIC = b"TGIF"
 FRAME_BYTES = 4096
 MIN_PATCH = 16         # v14 crashed switching to the image screen; v15 refused uploads
+SLOTS_PATCH = 26       # several stored images, each its own screen
+SLOTS = 8
 
 DEFAULTS = {
     "fps_cap": 12,          # never faster than this (lower it if playback stutters)
@@ -138,9 +146,14 @@ def convert(source, settings=None):
     return merged
 
 
-def header(frames, burst):
+def header(frames, burst, first=None):
+    """Version 1 (first=None, before v26) or version 2 with the first pool frame."""
     n = len(frames)
-    h = MAGIC + struct.pack("<BBHH6x", 1, 0, n, max(32, min(4096, int(burst))))
+    b = max(32, min(4096, int(burst)))
+    if first is None:
+        h = MAGIC + struct.pack("<BBHH6x", 1, 0, n, b)
+    else:
+        h = MAGIC + struct.pack("<BBHHH4x", 2, 0, n, b, first)
     return h + b"".join(struct.pack("<H", d) for _, d in frames)
 
 
@@ -155,7 +168,51 @@ def info(kb):
     if not r or r[0] != 0 or len(r) < 13:
         return None
     chip, base, cap, frames = struct.unpack("<IIHH", r[1:13])
-    return {"chip": chip, "base": base, "capacity": cap, "frames": frames}
+    out = {"chip": chip, "base": base, "capacity": cap, "frames": frames, "slots": 1, "pool": cap}
+    if len(r) >= 17 and r[14] >= 2:                      # v26: image slots
+        out["slots"], out["pool"] = r[14], struct.unpack("<H", r[15:17])[0]
+    return out
+
+
+def slot_offset(inf, s):
+    """Header offset of slot s, from the start of the GIF area."""
+    return 0 if s == 0 else inf["chip"] - s * 0x1000 - inf["base"]
+
+
+def _read(kb, off, n):
+    r = kb.cmd(0x18, _o24(off) + bytes([n]), timeout=2000)
+    return r[1:1 + n] if r and r[0] == 0 and len(r) >= 1 + n else None
+
+
+def read_slots(kb, inf=None):
+    """-> {slot: (first pool frame, frame count)} for the slots holding an image."""
+    inf = inf or info(kb)
+    out = {}
+    if not inf:
+        return out
+    for s in range(inf["slots"]):
+        h = _read(kb, slot_offset(inf, s), 12)
+        if not h or h[:4] != MAGIC:
+            continue
+        ver, n = h[4], struct.unpack("<H", h[6:8])[0]
+        first = struct.unpack("<H", h[10:12])[0] if ver == 2 else 0
+        if n and (ver == 2 or (ver == 1 and s == 0)) and first + n <= max(inf["pool"], inf["capacity"]):
+            out[s] = (first, n)
+    return out
+
+
+def _place_frames(inf, used, n, own=None):
+    """First pool frame for n frames, not overlapping other slots. Keeps the slot's current place
+    if it still fits (unchanged frames then skip rewriting)."""
+    taken = sorted(r for s, r in used.items() if s != own)
+    def free(a):
+        return a + n <= inf["pool"] and all(a + n <= f or a >= f + k for f, k in taken)
+    if own in used and free(used[own][0]):
+        return used[own][0]
+    for a in [0] + [f + k for f, k in taken]:
+        if free(a):
+            return a
+    return None
 
 
 def _crc(kb, off, length):
@@ -180,23 +237,36 @@ def _erase(kb, off):
         raise GifError(f"The keyboard refused to erase its GIF area (reply {r.hex()}).")
 
 
-def upload(kb, frames, burst, progress=lambda frac, msg: None):
-    """Stores the animation on the keyboard. Unchanged frames are skipped (checked by CRC)."""
+def upload(kb, frames, burst, progress=lambda frac, msg: None, slot=0):
+    """Stores the animation on the keyboard (in image slot `slot`, v26+). Unchanged frames are
+    skipped (checked by CRC)."""
     inf = info(kb)
     if inf is None:
         raise GifError(f"This keyboard's firmware has no image screen (needs REVIVER v{MIN_PATCH}+).")
+    if slot and inf["slots"] <= slot:
+        raise GifError(f"Storing more than one image needs REVIVER v{SLOTS_PATCH} or newer (Firmware tab).")
     if inf["capacity"] == 0:
         raise GifError("This keyboard's flash chip has no room for a GIF.")
-    if len(frames) > inf["capacity"]:
-        raise GifError(f"{len(frames)} frames won't fit; the keyboard holds {inf['capacity']}. "
-                       "Lower the frame-rate cap or trim the GIF.")
-    hdr = header(frames, burst)
-    progress(0.0, "Preparing...")
-    _erase(kb, 0)                                   # no valid header while frames change
     n = len(frames)
+    first = None
+    if inf["slots"] > 1:
+        used = read_slots(kb, inf)
+        first = _place_frames(inf, used, n, own=slot)
+        if first is None:
+            free = inf["pool"] - sum(k for s, (_, k) in used.items() if s != slot)
+            raise GifError(f"{n} frames won't fit: the keyboard has room for {max(0, free)} more "
+                           f"(it holds {inf['pool']} in all, shared by every stored image). "
+                           "Lower the frame-rate cap, trim the GIF or remove another stored image.")
+    elif n > inf["capacity"]:
+        raise GifError(f"{n} frames won't fit; the keyboard holds {inf['capacity']}. "
+                       "Lower the frame-rate cap or trim the GIF.")
+    hdr = header(frames, burst, first)
+    hoff = slot_offset(inf, slot) if inf["slots"] > 1 else 0
+    progress(0.0, "Preparing...")
+    _erase(kb, hoff)                                # no valid header while frames change
     for i, (img, _) in enumerate(frames):
         data = to_4bpp(img)
-        off = 0x1000 * (i + 1)
+        off = 0x1000 * ((first or 0) + i + 1)
         if _crc(kb, off, FRAME_BYTES) != zlib.crc32(data):
             for attempt in range(2):
                 _erase(kb, off)
@@ -206,12 +276,17 @@ def upload(kb, frames, burst, progress=lambda frac, msg: None):
             else:
                 raise GifError(f"Frame {i + 1} didn't verify after writing.")
         progress(0.02 + 0.95 * (i + 1) / n, f"Frame {i + 1} of {n}")
-    _write(kb, 16, hdr[16:])                        # delays first,
-    _write(kb, 0, hdr[:16])                         # then the part with the magic: the commit
-    if _crc(kb, 0, len(hdr)) != zlib.crc32(hdr):
+    _write(kb, hoff + 16, hdr[16:])                 # delays first,
+    _write(kb, hoff, hdr[:16])                      # then the part with the magic: the commit
+    if _crc(kb, hoff, len(hdr)) != zlib.crc32(hdr):
         raise GifError("The animation header didn't verify.")
     progress(1.0, f"Stored {n} frames on the keyboard.")
 
 
-def clear(kb):
+def clear(kb, slot=0):
+    if slot:
+        inf = info(kb)
+        if inf and inf["slots"] > slot:
+            _erase(kb, slot_offset(inf, slot))
+        return
     _erase(kb, 0)

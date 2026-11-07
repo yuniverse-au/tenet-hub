@@ -20,6 +20,9 @@ Firmware updates and screen packages for the **Metakey TENET 70** keyboard (Hexc
 ### Screens
 The **Screens** tab sets which screens the keyboard's screen button goes through, and in what order. Built-in screens (Dashboard, KPM, clock, the Hexcore Link logo, image screen, typing animation) can be turned on or off and moved; every screen package gets a screen of its own in the same list, up to 24 screens in all. The list is stored on the keyboard, so the button works the same with the PC off. Package screens only come up while TENET Hub is running, so the keyboard never stops on a blank screen. Needs REVIVER v21 or newer.
 
+### Stored animations
+Animation packages (like [Yuniverse dither](https://github.com/yuniverse-au/yuniverseTenetPackage)) get a screen of their own on REVIVER v26 or newer: turn one on in the Packages tab and TENET Hub stores it on the keyboard, next to your Image screen. It plays even with the PC off, and you place it in the Screens tab like any other screen. The keyboard holds up to 7 of them; they share its frame space (about 180 frames on a 1 MB chip) with the Image screen.
+
 ### PC stats
 The **PC stats** screen (built in, REVIVER v24+) shows three numbers plus the date and day. In the **PC stats** tab, pick what each number measures: CPU, GPU or disk usage or temperature, or memory usage. On REVIVER v25+ the label under each number follows your choice (CPU, GPU, RAM, DISK). Usage and memory come from Windows.
 

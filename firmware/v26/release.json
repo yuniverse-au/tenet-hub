@@ -1,0 +1,11 @@
+{
+  "name": "REVIVER v26",
+  "patch_version": 26,
+  "notes": "Animation packages get screens of their own: the keyboard now stores up to 7 more images or GIFs next to your Image screen, each its own screen in the Screens tab, all playing with the PC off. Turn an animation package on in the Packages tab and TENET Hub stores it. Your current Image screen stays as it is. Everything from v25: PC stats labels (CPU, GPU, RAM or DISK), PC stats with temperature or usage, your own screen list, a screen for every screen package, changeable boot logo, live drawing, screen-off support.",
+  "base": {
+    "version": "3.0.7",
+    "url": "https://s5.hexcore.xyz/releases/firmware/apxtenet/3.07/apx_tenet_KEY_APP.bin",
+    "sha256": "9AAB23C1098FA05D7EE0645826DA099D403A1A1285BAD8E70750202577DF4F56",
+    "size": 86620
+  }
+}

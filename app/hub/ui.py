@@ -71,17 +71,23 @@ class App:
         now = time.time()
         if now - getattr(self, "_gif_info_at", 0) > 5 and not self.busy and self.host.fw and self.host.fw.at_least(gif.MIN_PATCH):
             self._gif_info_at = now
-            try:
-                with self.host.lock:
+            if self.host.lock.acquire(blocking=False):     # not while the host is busy (e.g. storing an image)
+                try:
                     if self.host.kb:
                         self.gif_kbinfo = gif.info(self.host.kb) or self.gif_kbinfo
-            except Exception:
-                pass
+                except Exception:
+                    pass
+                finally:
+                    self.host.lock.release()
         if not self.busy:
             self.fw_status.set(self._fw_text())
         if now - getattr(self, "_stats_ui_at", 0) >= 1:
             self._stats_ui_at = now
             self._stats_live()
+            st = (self.host.storing, tuple(sorted(self.host.stored())))
+            if st != getattr(self, "_storing_seen", None):          # stored-screen progress in the Packages tab
+                self._storing_seen = st
+                self.refresh_packages()
         self.root.after(500, self._pump)
 
     def show(self):
@@ -206,11 +212,23 @@ class App:
                 screen = "Its own screen" if fw is None or fw.at_least(screens.MIN_PATCH) else \
                     api.PACKAGE_MODES.get(mode, "-")
             elif info.get("type") == "animation":
-                screen = "Image screen"
+                screen = "Its own screen (stored)" if self._slots_fw() else "Image screen"
             else:
                 screen = "(background)"
             if not m:
                 status, tag = ("New - not installed" if pid in new else "Not installed"), ("new" if pid in new else "")
+            elif m["type"] == "animation" and self._slots_fw():
+                st = self.host.storing
+                if st and st[0] == pid:
+                    status, tag = f"Storing on the keyboard: {st[2]}", ""
+                elif pid in self.host.problems:
+                    status, tag = self.host.problems[pid], "problem"
+                elif pid in self.host.stored() and pc.get("enabled"):
+                    status, tag = "On the keyboard", ""
+                elif pc.get("enabled"):
+                    status, tag = "Waiting to be stored", ""
+                else:
+                    status, tag = "Off", ""
             elif m["type"] == "animation":
                 status, tag = "Animation (use it from the Image screen tab)", ""
             elif pid in self.host.problems:
@@ -244,6 +262,11 @@ class App:
         if hasattr(self, "scr_tv"):
             self.refresh_screens()
 
+    def _slots_fw(self):
+        """Animation packages get stored screens of their own (REVIVER v26+)."""
+        fw = self.host.fw
+        return fw is not None and fw.at_least(gif.SLOTS_PATCH)
+
     def _sel(self):
         s = self.pkg_tv.selection()
         return s[0] if s else None
@@ -254,10 +277,10 @@ class App:
         info = m or a or {}
         self.b_install.configure(state="normal" if a and (not m or pid in self.reg.updatable()) else "disabled",
                                  text="Update" if m else "Install")
-        anim = bool(info) and info.get("type") == "animation"
+        anim = bool(info) and info.get("type") == "animation" and not self._slots_fw()
         self.b_toggle.configure(state="normal" if m and not anim else "disabled",
                                 text="Turn off" if m and self.cfg.pkg(pid).get("enabled") else "Turn on")
-        self.b_settings.configure(state="normal" if m and not anim else "disabled")
+        self.b_settings.configure(state="normal" if m and info.get("type") != "animation" else "disabled")
         self.b_remove.configure(state="normal" if m else "disabled")
         lines = []
         if info:

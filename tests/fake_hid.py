@@ -1,4 +1,4 @@
-"""A fake TENET 70 for tests: speaks the vendor protocol (REVIVER v24) and the IAP protocol.
+"""A fake TENET 70 for tests: speaks the vendor protocol (REVIVER v26) and the IAP protocol.
 Install with sys.modules['hid'] = fake_hid. Records everything and flags pipelined packets."""
 import struct, threading, time
 
@@ -6,7 +6,7 @@ VID, PID = 0x3311, 0xF005
 
 
 class Board:
-    def __init__(self, patch=24):
+    def __init__(self, patch=26):
         self.patch = patch
         self.state = "app"          # "app" | "iap" | "gone"
         self.mode = 5
@@ -27,6 +27,7 @@ class Board:
         self.stats_units = None          # v24 70 23
         self.stats_values = None         # stock 70 09
         self.stats_on = False            # mode 6 shows PC stats
+        self.imgslot = 0                 # v26: image slot shown in mode 6
         self.stats_labels = [b""] * 3    # v25 70 24 (b"" = the stock picture)
         self.lights = None               # stock 20 03 FF 01 r g b
         self.brightness, self.brightness_writes = 80, 0     # stock 20 15 / A0 15
@@ -43,10 +44,13 @@ class Board:
         ok = lambda off, n: n <= size and off <= size - n
         if sub == 0x15:
             h = self.spi[base:base + 8]
-            frames = struct.unpack_from("<H", h, 6)[0] if h[:4] == b"TGIF" and h[4] == 1 else 0
+            frames = struct.unpack_from("<H", h, 6)[0] if h[:4] == b"TGIF" and h[4] in (1, 2) else 0
             r = b"\x00" + struct.pack("<IIHH", self.chip, base, (self.chip - base - 0x1000) // 4096, frames)
             if self.patch >= 20:
                 r += bytes([self.spi[0x3E000:0x3E004] == b"TBOT" and self.spi[0x3E004] == 1])
+            if self.patch >= 26:                       # image slots: count, pool frames
+                pool = (self.chip - 7 * 0x1000 - 0x41000) // 0x1000
+                r += bytes([8]) + struct.pack("<H", pool)
             return r
         off = o24(a)
         if sub == 0x16 and off % 4096 == 0 and ok(off, 4096):
@@ -67,7 +71,8 @@ class Board:
 
     def _screens(self, sub, a):
         ok = True
-        valid = lambda e: (1 <= e <= (8 if self.patch >= 24 else 7) and e != 5) or 0x80 <= e < 0x98
+        valid = lambda e: (1 <= e <= (8 if self.patch >= 24 else 7) and e != 5) or 0x80 <= e < 0x98 or \
+            (self.patch >= 26 and 0x41 <= e <= 0x47)
         if sub == 0x20:
             self.hub_alive = True
         elif sub == 0x21:
@@ -78,21 +83,16 @@ class Board:
         elif sub == 0x22:
             ok = valid(a[0])
             if ok:
-                if a[0] >= 0x80:
-                    self.mode, self.slot = 5, a[0] - 0x80
-                elif a[0] == 8:
-                    self.mode, self.stats_on = 6, True
-                else:
-                    self.mode, self.stats_on = a[0], False if a[0] == 6 else self.stats_on
+                self._enter(a[0])
         if not ok:
             return b"\x01"
-        cur = 0x80 + self.slot if self.mode == 5 else 8 if (self.mode == 6 and self.stats_on) else self.mode
+        cur = self._current()
         return bytes([0, self.mode, cur, self.hub_alive, len(self.scr)] + self.scr)
 
     def press(self, forward=True):
         """The screen button, as the v21+ firmware does it."""
         l = self.scr
-        cur = 0x80 + self.slot if self.mode == 5 else 8 if (self.mode == 6 and self.stats_on) else self.mode
+        cur = self._current()
         at = l.index(cur) if cur in l else (len(l) - 1 if forward else 0)
         for k in range(1, len(l) + 1):
             e = l[(at + (k if forward else -k)) % len(l)]
@@ -100,13 +100,30 @@ class Board:
                 continue
             if e >= 0x80:
                 self.mode, self.slot = 5, e - 0x80
-            elif e == 8:
-                self.mode, self.stats_on = 6, True
             else:
-                self.mode = e
-                if e == 6:
-                    self.stats_on = False
+                self._enter(e)
             return
+
+    def _current(self):
+        if self.mode == 5:
+            return 0x80 + self.slot
+        if self.mode == 6 and self.stats_on:
+            return 8
+        if self.mode == 6 and self.imgslot:
+            return 0x40 + self.imgslot
+        return self.mode
+
+    def _enter(self, e):
+        if e >= 0x80:
+            self.mode, self.slot = 5, e - 0x80
+        elif e == 8:
+            self.mode, self.stats_on = 6, True
+        elif 0x41 <= e <= 0x47:
+            self.mode, self.stats_on, self.imgslot = 6, False, e - 0x40
+        else:
+            self.mode = e
+            if e == 6:
+                self.stats_on, self.imgslot = False, 0
 
     def reply(self, hdr, cmd, payload=b""):
         body = cmd + payload

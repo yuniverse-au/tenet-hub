@@ -25,11 +25,15 @@ STOCK = {                     # in default order
 }
 DEFAULT_ON = {1, 6, 7, 8}
 NEEDS_HUB = {STATS}           # like package screens: only in the cycle while TENET Hub runs
+IMG = 0x40                    # stored image slot s (REVIVER v26+): code 0x40 + s, s = 1..7
+IMG_PATCH = 26
 
 
 def _screen_packages(reg):
+    """Packages that get a screen: screen packages (drawn live) and animation packages (stored on
+    the keyboard, v26+)."""
     return [pid for pid, m in sorted(reg.installed.items(), key=lambda x: x[1].get("name", x[0]).lower())
-            if m.get("type") == "screen"]
+            if m.get("type") in ("screen", "animation")]
 
 
 def entries(cfg, reg):
@@ -52,10 +56,17 @@ def entries(cfg, reg):
     if not out:                                   # first run: the v20 order, packages after Dashboard
         out = [{"id": f"stock:{k}", "on": k in DEFAULT_ON} for k in STOCK]
         seen = {e["id"] for e in out}
-    for pid in pkgs:                              # new packages go after the last package screen
+    for pid in pkgs:
         if f"pkg:{pid}" not in seen:
-            last = max([n for n, e in enumerate(out) if e["id"].startswith("pkg:")] + [0])
-            out.insert(last + 1, {"id": f"pkg:{pid}"})
+            if reg.installed[pid].get("type") == "animation":     # stored images: after the Image screen
+                at = next((n + 1 for n, e in enumerate(out) if e["id"] == "stock:6"), len(out))
+                while at < len(out) and out[at]["id"].startswith("pkg:") and \
+                        reg.installed.get(out[at]["id"][4:], {}).get("type") == "animation":
+                    at += 1
+                out.insert(at, {"id": f"pkg:{pid}"})
+            else:                                 # screen packages: after the last package screen
+                last = max([n for n, e in enumerate(out) if e["id"].startswith("pkg:")] + [0])
+                out.insert(last + 1, {"id": f"pkg:{pid}"})
     for k in STOCK:
         if f"stock:{k}" not in seen and not any(e["id"] == f"stock:{k}" for e in out):
             if k == STATS:                        # new in v24: after the image screen, on
@@ -68,7 +79,8 @@ def entries(cfg, reg):
             pid = e["id"][4:]
             e["on"] = bool(cfg.pkg(pid).get("enabled"))
             e["name"] = reg.installed[pid].get("name", pid)
-            e["kind"] = "Package"
+            e["type"] = reg.installed[pid].get("type")
+            e["kind"] = "Package (stored)" if e["type"] == "animation" else "Package"
         else:
             e["name"] = STOCK[int(e["id"][6:])]
             e["kind"] = "Built in"
@@ -81,11 +93,13 @@ def save(cfg, items):
                         for e in items])
 
 
-def keyboard_list(items, patch=99):
+def keyboard_list(items, patch=99, stored=None):
     """-> (codes for 70 21, {package id: code}). Always has a built-in screen the keyboard can show
     on its own; at most MAX entries. `patch`: the keyboard's REVIVER version (older ones refuse
-    codes they don't know, e.g. PC stats before v24)."""
+    codes they don't know, e.g. PC stats before v24). `stored`: {animation package id: image slot}
+    for the animations already stored on the keyboard (others are left out until they are)."""
     codes, slots, k = [], {}, 0
+    stored = stored or {}
     for e in items:
         if not e["on"] or len(codes) >= MAX:
             continue
@@ -94,11 +108,16 @@ def keyboard_list(items, patch=99):
             if code == STATS and patch < STATS_PATCH:
                 continue
             codes.append(code)
+        elif e.get("type") == "animation":
+            pid = e["id"][4:]
+            if patch >= IMG_PATCH and pid in stored:
+                slots[pid] = IMG + stored[pid]
+                codes.append(IMG + stored[pid])
         elif k < MAX:
             slots[e["id"][4:]] = PKG + k
             codes.append(PKG + k)
             k += 1
-    if not any(c < PKG and c not in NEEDS_HUB for c in codes):
+    if not any(c < IMG and c not in NEEDS_HUB for c in codes) and not any(IMG < c < PKG for c in codes):
         codes = ([1] + codes)[:MAX]
     slots = {p: c for p, c in slots.items() if c in codes}
     return codes, slots
