@@ -10,7 +10,7 @@ Download **TenetHub.exe** below and run it (Windows 10 or 11, no installer). If 
 ## Everything from 1.0.0
 
 - REVIVER v25 firmware from the Firmware tab (PC stats labels that follow what each number measures)
-- Now Playing, community packages from other people's GitHub repos ([how to make your own](https://github.com/yuniverse-au/tenet-hub/blob/main/docs/community-packages.md))
+- Now Playing, community packages from other people's GitHub repos ([how to make your own](https://github.com/yuuusername/tenet-hub/blob/main/docs/community-packages.md))
 - Screens list, PC stats with built-in temperature sensors, image screen with rotation, boot logo, keyboard clock sync, burn-in care
 
 If the keyboard ever stops responding after a firmware update: unplug it, hold **Esc** while plugging it back in (it starts in update mode), then install the official firmware from the Firmware tab. Typing keeps working on every REVIVER version.

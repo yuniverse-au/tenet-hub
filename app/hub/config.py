@@ -1,7 +1,8 @@
 """Settings and data folders. Everything lives in %LOCALAPPDATA%\\TenetHub."""
 import json, os, sys, threading
 
-DEFAULT_INDEX = "https://raw.githubusercontent.com/yuniverse-au/tenet-hub/main/index.json"
+DEFAULT_INDEX = "https://raw.githubusercontent.com/yuuusername/tenet-hub/main/index.json"
+OLD_INDEXES = ("https://raw.githubusercontent.com/yuniverse-au/tenet-hub/main/index.json",)   # before the repo moved
 
 
 def data_dir(*parts):
@@ -43,6 +44,8 @@ class Config:
                 self.data.update(json.load(f))
         except (OSError, ValueError):
             pass
+        if self.data.get("index_url") in OLD_INDEXES:      # the repo moved: follow it
+            self.data["index_url"] = DEFAULT_INDEX
 
     def __getitem__(self, k):
         return self.data[k]

@@ -41,7 +41,7 @@ One repo can hold any number of packages.
 TENET Hub reads `index.json` (the list of your packages, their versions and checksums) and downloads each package as a zip from `catalog/`. Make both with the same tool the official catalogue uses. You need Python 3.10+ and a copy of this repo:
 
 ```
-git clone https://github.com/yuniverse-au/tenet-hub
+git clone https://github.com/yuuusername/tenet-hub
 python tenet-hub/tools/build_index.py --community --root my-tenet-packages --name "Your name's packages"
 ```
 

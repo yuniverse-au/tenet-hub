@@ -1560,7 +1560,7 @@ class CommunitySources(tk.Toplevel):
         ttk.Button(bar, text="Open repo page", command=self.open_page).pack(side="left")
         ttk.Button(bar, text="Remove", command=self.remove).pack(side="left", padx=6)
         ttk.Button(bar, text="How to make packages", command=lambda: webbrowser.open(
-            "https://github.com/yuniverse-au/tenet-hub/blob/main/docs/community-packages.md")).pack(side="left")
+            "https://github.com/yuuusername/tenet-hub/blob/main/docs/community-packages.md")).pack(side="left")
         ttk.Button(bar, text="Close", command=self.destroy).pack(side="right")
         self.msg = tk.StringVar()
         ttk.Label(f, textvariable=self.msg, foreground="#555", wraplength=560).pack(anchor="w", pady=(6, 0))

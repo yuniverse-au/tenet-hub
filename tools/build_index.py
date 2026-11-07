@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(ROOT, "app"))
 from hub import VERSION                      # noqa: E402
 from hub.packages import Manifest            # noqa: E402
 
-HUB_RELEASES = "https://github.com/yuniverse-au/tenet-hub/releases/latest"
+HUB_RELEASES = "https://github.com/yuuusername/tenet-hub/releases/latest"
 
 
 def sha(b):

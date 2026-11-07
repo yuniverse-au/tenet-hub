@@ -12,7 +12,7 @@ Firmware updates and screen packages for the **Metakey TENET 70** keyboard (Hexc
 
 ## Install
 
-1. Download `TenetHub.exe` from [Releases](https://github.com/yuniverse-au/tenet-hub/releases/latest) and run it. It sits in the system tray and starts when you log in (you can turn that off in Settings).
+1. Download `TenetHub.exe` from [Releases](https://github.com/yuuusername/tenet-hub/releases/latest) and run it. It sits in the system tray and starts when you log in (you can turn that off in Settings).
 2. **Close Hexcore Link.** Only one program can talk to the keyboard at a time.
 3. Open the **Firmware** tab and install the latest **REVIVER** firmware. It takes about a minute; keep the keyboard plugged in.
 4. On the **Packages** tab, turn on the packages you want. Now Playing is included. Each screen package gets a screen of its own on the keyboard; press the keyboard's screen button to get there.
