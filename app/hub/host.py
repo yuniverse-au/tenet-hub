@@ -54,6 +54,7 @@ class Host:
         self._units_sent, self._stats_at, self._labels_sent = None, 0.0, {}
         self._kb_slots = None
         self.storing = None                           # (package id, fraction, message) while storing one
+        self._store_failed = {}                       # package id -> (version, why): not retried until turned off and on
         self.running = {}                 # id -> Running
         self.problems = {}                # id -> why it isn't running
         self.paused = threading.Event()   # set while flashing: the host lets go of the keyboard
@@ -270,7 +271,10 @@ class Host:
         for pid in list(self.problems):
             if pid not in wanted and self.reg.installed.get(pid, {}).get("type") == "animation":
                 self.problems.pop(pid)
-        for pid in list(stored):                                  # turned off / removed: free the slot
+        for pid in list(self._store_failed):                      # turned off or removed: may try again
+            if pid not in wanted:
+                self._store_failed.pop(pid)
+        for pid in list(stored):                                # turned off / removed: free the slot
             if pid not in wanted:
                 s = stored.pop(pid)["slot"]
                 try:
@@ -281,14 +285,15 @@ class Host:
                 self._set_stored(stored)
                 self.log(f"removed {pid} from image slot {s}")
                 return
-        failed = getattr(self, "_store_failed", {})
         for pid, m in sorted(wanted.items()):
             have = stored.get(pid)
             if have and have.get("version") == m["version"] and have["slot"] in self._kb_slots:
                 self.problems.pop(pid, None)
                 continue
-            if failed.get(pid) == m["version"]:
-                continue                                          # failed for this version: wait for a change
+            failed = self._store_failed.get(pid)
+            if failed and failed[0] == m["version"]:              # failed for this version: wait for a change
+                self.problems[pid] = failed[1]                    # (reload() clears problems: keep it showing)
+                continue
             used = {v["slot"] for p, v in stored.items() if p != pid}
             slot = have["slot"] if have else next((s for s in range(1, gif.SLOTS) if s not in used), None)
             if slot is None:
@@ -303,8 +308,10 @@ class Host:
                 gif.upload(self.kb, frames, s["burst"], lambda frac, msg, pid=pid: setattr(self, "storing", (pid, frac, msg)),
                            slot=slot)
             except gif.GifError as e:
-                self.problems[pid] = f"Couldn't store it on the keyboard: {e}"
-                self._store_failed = dict(failed, **{pid: m["version"]})
+                why = f"Couldn't store it on the keyboard: {e} Turn it off and on to try again."
+                self.log(f"couldn't store {pid} in image slot {slot}: {e}")
+                self.problems[pid] = why
+                self._store_failed[pid] = (m["version"], why)
                 return
             finally:
                 self.storing = None

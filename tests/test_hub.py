@@ -586,6 +586,33 @@ for _ in range(3):
     host._tick()
 check("v25 keyboard: animation packages aren't stored or listed", "test-loop" not in host.stored() and 0x41 not in B.scr)
 cfg.pkg("test-loop")["enabled"] = False; cfg.save(); B.patch = 26
+# a failed store stays visible, even after a reload, and turning the package off and on retries it
+host._disconnect("x"); cfg.pkg("test-loop")["enabled"] = True; cfg.save()
+real_upload, tries = gif.upload, []
+def failing_upload(*a, **k):
+    tries.append(1)
+    raise gif.GifError("The keyboard didn't answer a write.")
+gif.upload = failing_upload
+for _ in range(3):
+    host._tick()
+check(f"failed store shows why: {host.problems.get('test-loop')}",
+      "didn't answer a write" in host.problems.get("test-loop", "") and "test-loop" not in host.stored())
+check("failed store is in the log", any("couldn't store test-loop" in l and "didn't answer a write" in l for l in logs))
+host.reload()
+for _ in range(3):
+    host._tick()
+check("the reason survives a reload (not a silent 'Waiting to be stored')",
+      "didn't answer a write" in host.problems.get("test-loop", ""))
+check(f"not retried by itself ({len(tries)} try)", len(tries) == 1)
+gif.upload = real_upload
+cfg.pkg("test-loop")["enabled"] = False; cfg.save()
+host._tick()
+cfg.pkg("test-loop")["enabled"] = True; cfg.save()
+for _ in range(3):
+    host._tick()
+check(f"off and on again retries it: {host.stored()}",
+      host.stored().get("test-loop", {}).get("slot") == 1 and "test-loop" not in host.problems)
+cfg.pkg("test-loop")["enabled"] = False; cfg.save()
 check(f"no pipelining ({B.violations})", B.violations == 0)
 
 print("ALL PASS" if ok else "SOME FAILED")

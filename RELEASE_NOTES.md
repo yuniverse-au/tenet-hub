@@ -1,20 +1,18 @@
-**TENET Hub 1.2.0**: animation packages get stored screens of their own, and they play with the PC off.
+**TENET Hub 1.3.0**: TENET Hub can now update itself with one click.
 
-Download **TenetHub.exe** below and run it (Windows 10 or 11, no installer). If you already have TENET Hub, replace the old TenetHub.exe with this one. If you set up the built-in temperature sensors and the new exe is in a different place, click **Set up again** in the PC stats tab.
+Download **TenetHub.exe** below and run it (Windows 10 or 11, no installer). If you already have TENET Hub, quit it from the tray and replace the old TenetHub.exe with this one. This is the last time you need to do that by hand. If you set up the built-in temperature sensors and the new exe is in a different place, click **Set up again** in the PC stats tab.
 
 ## New
 
-- **Stored animations (needs REVIVER v26, in the Firmware tab):** turn an animation package on in the Packages tab and TENET Hub stores it on the keyboard, with progress shown in that tab. It gets its own screen, which you place in the Screens tab, and it plays even with the PC off. Turn the package off to free its space.
-- **Room for 7 of them, next to your Image screen:** they all share the keyboard's frame space (about 180 frames on a 1 MB chip). If an image won't fit, TENET Hub tells you how much room is left. Your current Image screen stays as it is.
-- **New home:** TENET Hub now lives at [yuuusername/tenet-hub](https://github.com/yuuusername/tenet-hub). This version updates its saved catalogue address by itself.
+- **One-click updates for TENET Hub itself:** when a new version is out, click the banner at the top of the window, or **Update and restart** in Settings. TENET Hub downloads it, checks it, replaces itself and restarts, in the same place with your settings kept. If it can't (for example, its folder is read-only), your current version keeps running and it offers the download page instead.
 
 ## Fixed
 
-- The app no longer stalls waiting on the keyboard while an image is being stored.
-- Now Playing 1.0.2: "Nothing playing" is no longer cut off at the top.
+- **Stored animations that fail now say why:** if an animation package can't be stored on the keyboard, the Packages tab keeps showing the reason, and it's written to the log. Turn the package off and on to try again.
 
 ## Everything from earlier versions
 
+- Stored animations with REVIVER v26: animation packages get a screen of their own and play even with the PC off
 - Lighting tab: one colour or off, with a brightness slider
 - Optional automatic updates for community packages
 - Now Playing, community packages from other people's GitHub repos ([how to make your own](https://github.com/yuuusername/tenet-hub/blob/main/docs/community-packages.md))
